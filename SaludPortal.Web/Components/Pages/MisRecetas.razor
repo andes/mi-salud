@@ -1,0 +1,54 @@
+﻿@page "/misrecetas"
+@rendermode InteractiveServer
+
+@using Microsoft.AspNetCore.Components.Authorization
+@using SaludPortal.Application.Models.Recetas
+@using SaludPortal.Application.UseCases.Recetas
+@using SaludPortal.Web.Components.Shared
+
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject BlazorSpinner.SpinnerService _spinnerService
+@inject ObtenerRecetasUseCase _obtenerRecetasUseCase
+
+@inherits AuthenticatedComponentBase
+
+<PageTitle>Mis recetas - Mi Salud</PageTitle>
+
+<div class="recetas-container">
+    <PageHeaderWithBack Title="Mis Recetas"
+                        Subtitle="Historial de recetas médicas"
+                        BackHref="/historiasalud"
+                        BackAriaLabel="Volver al historial de salud" />
+
+    @if (recetas != null && recetas.Any())
+    {
+        <div class="recetas-section">
+            <SectionTitle Title="Recetas Médicas" Icon="bi bi-file-medical" />
+            <div class="recetas-grid">
+                @foreach (var receta in recetas.OrderByDescending(r => r.FechaRegistro))
+                {
+                    <RecetaCard Receta="receta" />
+                }
+            </div>
+        </div>
+    }
+    else
+    {
+        <EmptyState Message="No se encontraron recetas registradas." />
+    }
+</div>
+
+@code {
+    private List<Receta> recetas = new List<Receta>();
+
+    protected override async Task OnAuthenticatedInitializedAsync()
+    {
+        var token = BackendToken;
+        if (string.IsNullOrEmpty(token))
+            return;
+
+        _spinnerService.Show();
+        recetas = await _obtenerRecetasUseCase.EjecutarAsync(PacienteId);
+        _spinnerService.Hide();
+    }
+}

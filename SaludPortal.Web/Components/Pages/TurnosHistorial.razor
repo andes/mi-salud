@@ -1,0 +1,172 @@
+﻿@page "/turnosHistorial"
+@rendermode InteractiveServer
+
+@using Microsoft.AspNetCore.Components.Authorization
+@using SaludPortal.Web.Components.Modals
+@using SaludPortal.Web.Components.Shared
+@using SaludPortal.Web.Components.Icons
+@using SaludPortal.Application.Models.Turnos
+@using System.Linq
+@using SaludPortal.Application.UseCases.Turnos
+
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject BlazorSpinner.SpinnerService _spinnerService
+@inject ObtenerHistorialTurnosUseCase _obtenerHistorialTurnosUseCase
+@inject TelemetryService Telemetry
+@inject ILogger<TurnosHistorial> Logger
+
+@inherits AuthenticatedComponentBase
+
+<PageTitle>Historial de turnos - Mi Salud</PageTitle>
+
+<div class="turnos-historial-container">
+    <PageHeaderWithBack Title="Mis turnos: Historial" 
+                        Subtitle="Historial de turnos médicos"
+                        BackHref="/misturnos"
+                        BackAriaLabel="Volver al Mis Turnos" />
+
+    @if (errorMessage != null)
+    {
+        <div class="alert alert-danger" role="alert">@errorMessage</div>
+    }
+    else if (!turnos.Any())
+    {
+        <EmptyState Message="No se encontraron turnos en el historial." />
+    }
+    else
+    {
+        numerar = 0;
+
+    var turnosAgrupados = turnos
+        .Where(t => t.TipoPrestacion != null && !string.IsNullOrEmpty(t.TipoPrestacion.ConceptId))
+        .GroupBy(t => t?.TipoPrestacion?.ConceptId)
+        .Select(g => new
+        {
+            TipoPrestacionConceptId = g.Key,
+                TipoPrestacionTerm = g.First().TipoPrestacion?.Term,
+            Turnos = g.ToList()
+        })
+        .ToList();
+
+    var turnosSinTipo = turnos
+        .Where(t => t.TipoPrestacion == null || string.IsNullOrEmpty(t?.TipoPrestacion?.ConceptId))
+        .ToList();
+
+        var sectionIndex = 0;
+
+    @foreach (var grupo in turnosAgrupados)
+    {
+            var turnosPasados = grupo.Turnos.OrderByDescending(t => t.FechaHora).ToList();
+            
+            @if (turnosPasados.Any())
+        {
+                var collapseId = $"collapse-turnos-{sectionIndex}";
+                var headerId = $"header-turnos-{sectionIndex}";
+                sectionIndex++;
+                
+                <div class="turnos-section">
+                    <div class="turnos-section-header" id="@headerId">
+                        <button class="turnos-collapse-button" type="button" data-bs-toggle="collapse" data-bs-target="#@collapseId" aria-expanded="true" aria-controls="@collapseId">
+                            <div class="turnos-section-title">
+                                <Icon Name="calendar-check" Size="24" Fill="#87b867" AriaLabel="Tipo de prestación" />
+                                <span>@(grupo.TipoPrestacionTerm?.ToUpper() ?? "SIN TIPO")</span>
+                            </div>
+                        </button>
+                    </div>
+                    <div id="@collapseId" class="collapse" aria-labelledby="@headerId">
+                        <div class="turnos-grid">
+                            @foreach (var miTurno in turnosPasados)
+                            {
+                                numerar += 1;
+                                <TurnoCard Turno="miTurno" Numero="numerar" OnClick="HandleTurnoClick" />
+                            }
+                        </div>
+                    </div>
+                </div>
+            }
+    }
+
+    @if (turnosSinTipo.Any())
+    {
+            var turnosSinTipoPasados = turnosSinTipo.OrderByDescending(t => t.FechaHora).ToList();
+            
+            @if (turnosSinTipoPasados.Any())
+            {
+                var collapseId = $"collapse-turnos-{sectionIndex}";
+                var headerId = $"header-turnos-{sectionIndex}";
+                
+                <div class="turnos-section">
+                    <div class="turnos-section-header" id="@headerId">
+                        <button class="turnos-collapse-button" type="button" data-bs-toggle="collapse" data-bs-target="#@collapseId" aria-expanded="false" aria-controls="@collapseId">
+                            <div class="turnos-section-title">
+                                <Icon Name="calendar-x" Size="24" Fill="#87b867" AriaLabel="Sin tipo" />
+                                <span>SIN TIPO DE PRESTACIÓN</span>
+                            </div>
+                        </button>
+                    </div>
+                    <div id="@collapseId" class="collapse" aria-labelledby="@headerId">
+                        <div class="turnos-grid">
+                            @foreach (var miTurno in turnosSinTipoPasados)
+                            {
+                                numerar += 1;
+                                <TurnoCard Turno="miTurno" Numero="numerar" OnClick="HandleTurnoClick" />
+                            }
+                            </div>
+                    </div>
+                </div>
+            }
+        }
+    }
+</div>
+
+@code {
+    private List<Turno> turnos = new List<Turno>();
+    private string? errorMessage;
+    private int numerar = 0;
+
+    [CascadingParameter] IModalService Modal { get; set; } = default!;
+
+    private async Task HandleTurnoClick(Turno turno)
+    {
+        _ = Telemetry.TrackClickAsync("turnos/detalle-historial", "/turnosHistorial", new { turnoId = turno.Id });
+
+        var options = new ModalOptions()
+        {
+            Size = ModalSize.Automatic,
+            Position = ModalPosition.TopCenter,
+            HideCloseButton = true,
+            HideHeader = true
+        };
+        var parameters = new ModalParameters()
+        .Add(nameof(MisTurnosDetalle.Paciente), turno.Paciente?.GetDisplayName() ?? "Paciente sin nombre")
+        .Add(nameof(MisTurnosDetalle.FechaHoraTurno), turno.FechaHora.ToString("dd/MM/yyyy HH:mm"))
+        .Add(nameof(MisTurnosDetalle.DatosConsulta), turno.MotivoConsulta ?? "No disponible")
+        .Add(nameof(MisTurnosDetalle.Lugar), turno.Organizacion?.Nombre ?? "No disponible");
+
+        Modal.Show<MisTurnosDetalle>(parameters, options);
+
+    } 
+
+    protected override async Task OnAuthenticatedInitializedAsync()
+    {
+        numerar = 0;
+        var token = BackendToken;
+        if (string.IsNullOrEmpty(token))
+            return;
+
+        _spinnerService.Show();
+        try
+        {
+            turnos = await _obtenerHistorialTurnosUseCase.EjecutarAsync();
+        }
+        catch (Exception exception)
+        {
+            errorMessage = "No se pudieron cargar los turnos. Intenta nuevamente más tarde.";
+            Logger.LogError(exception, "Error al obtener el historial de turnos");
+        }
+        finally
+        {
+            _spinnerService.Hide();
+        }
+    }
+}

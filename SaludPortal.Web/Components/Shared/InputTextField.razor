@@ -1,0 +1,94 @@
+@using System.Linq.Expressions
+@using Microsoft.AspNetCore.Components.Forms
+@using SaludPortal.Web.Components.Icons
+@typeparam TValue
+
+<div class="input-field-group">
+    @if (!string.IsNullOrWhiteSpace(Label))
+    {
+        <label for="@Id" class="input-label">@Label</label>
+    }
+    <div class="input-group @(HasError ? "invalid" : "")">
+        <div class="input-icon">
+            <Icon Name="@IconName" Size="18" Fill="#666" AriaLabel="@AriaLabel" />
+        </div>
+        <input id="@Id"
+               type="@EffectiveInputType"
+               @bind="@CurrentValue"
+               class="input-field @(Uppercase ? "uppercase" : "")"
+               placeholder="@Placeholder"
+               aria-label="@AriaLabel"
+               maxlength="@(MaxLength > 0 ? MaxLength : null)"
+               pattern="@(!string.IsNullOrWhiteSpace(Pattern) ? Pattern : null)"
+               inputmode="@(!string.IsNullOrWhiteSpace(InputMode) ? InputMode : null)"
+               disabled="@Disabled" />
+        @if (ShowPasswordToggle && Type.Equals("password", StringComparison.OrdinalIgnoreCase))
+        {
+            <button type="button"
+                    class="btn btn-link input-password-toggle"
+                    style="padding: 0 10px; border: 0; background: transparent; color: #666; text-decoration: none; display: flex; align-items: center; justify-content: center;"
+                    aria-label="@(_showPassword ? "Ocultar contraseña" : "Mostrar contraseña")"
+                    title="@(_showPassword ? "Ocultar contraseña" : "Mostrar contraseña")"
+                    @onclick="TogglePasswordVisibility"
+                    @onclick:preventDefault="true">
+                @if (_showPassword)
+                {
+                    <Icon Name="eye-slash" Size="18" Fill="#666" AriaLabel="Ocultar contraseña" />
+                }
+                else
+                {
+                    <Icon Name="eye" Size="18" Fill="#666" AriaLabel="Mostrar contraseña" />
+                }                
+            </button>
+        }
+    </div>
+    <ValidationMessage For="@ValidationFor" class="validation-message" style="color: #dc3545;" />
+</div>
+
+@code {
+    [Parameter] public string Id { get; set; } = "";
+    [Parameter] public string Type { get; set; } = "text";
+    [Parameter] public string Label { get; set; } = "";
+    [Parameter] public string IconName { get; set; } = "";
+    [Parameter] public string Placeholder { get; set; } = "";
+    [Parameter] public string AriaLabel { get; set; } = "";
+    [Parameter] public bool Disabled { get; set; } = false;
+    [Parameter] public int MaxLength { get; set; } = 0;
+    [Parameter] public bool Uppercase { get; set; } = false;
+    [Parameter] public string Pattern { get; set; } = "";
+    [Parameter] public string InputMode { get; set; } = "";
+    [Parameter] public bool ShowPasswordToggle { get; set; } = false;
+    [Parameter] public TValue? Value { get; set; }
+    [Parameter] public EventCallback<TValue> ValueChanged { get; set; }
+    [Parameter] public Expression<Func<TValue>>? ValidationFor { get; set; }
+    [Parameter] public bool HasError { get; set; } = false;
+
+    private bool _showPassword;
+
+    private string EffectiveInputType => ShowPasswordToggle && Type.Equals("password", StringComparison.OrdinalIgnoreCase) && _showPassword ? "text" : Type;
+
+    private void TogglePasswordVisibility()
+    {
+        _showPassword = !_showPassword;
+    }
+
+    private TValue? CurrentValue
+    {
+        get => Value;
+        set
+        {
+            var finalValue = value;
+
+            if (Uppercase && finalValue is string strValue)
+            {
+                finalValue = (TValue)(object)strValue.ToUpperInvariant();
+            }
+
+            if (!EqualityComparer<TValue>.Default.Equals(finalValue, Value))
+            {
+                Value = finalValue;
+                ValueChanged.InvokeAsync(finalValue);
+            }
+        }
+    }
+}

@@ -1,0 +1,15 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\AndesServices\AndesServices.csproj" />
+    <ProjectReference Include="..\RecetarServices\RecetarServices.csproj" />
+    <ProjectReference Include="..\XroadssAndesServices\XroadssAndesServices.csproj" />
+  </ItemGroup>
+
+</Project>

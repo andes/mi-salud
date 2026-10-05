@@ -1,0 +1,180 @@
+﻿@page "/misturnos"
+@rendermode InteractiveServer
+
+@using System.Linq
+@using Microsoft.AspNetCore.Components.Authorization
+@using SaludPortal.Application.Models.Turnos
+@using SaludPortal.Web.Components.Icons
+@using SaludPortal.Web.Components.Modals
+@using SaludPortal.Web.Components.Shared
+@using SaludPortal.Application.UseCases.Turnos
+@using SaludPortal.Application.Utils
+
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject BlazorSpinner.SpinnerService _spinnerService
+@inject ObtenerTurnosUseCase _obtenerTurnosUseCase
+@inject ILogger<Misturnos> _logger
+@inject NavigationManager Nav
+@inject TelemetryService Telemetry
+
+@inherits AuthenticatedComponentBase
+
+<PageTitle>Mis turnos - Mi Salud</PageTitle>
+
+<div class="misturnos-container">
+    <PageHeaderWithBack Title="Mis turnos" Subtitle="Turnos programados y próximos" BackHref="/"
+                        BackAriaLabel="Volver al Inicio" />
+
+    <div class="misturnos-actions">
+        <a href="/turnosNuevo" class="btn btn-success" @onclick='() => TrackClick("turnos/solicitar", "/turnosnuevo")'>
+            <Icon Name="calendar-plus" Size="20" Fill="#fff" class="me-2" AriaLabel="Solicitar" />
+            Solicitar turno
+        </a>
+        <a href="/turnosHistorial" class="btn btn-primary" @onclick='() => TrackClick("turnos/historial", "/turnosHistorial")'>
+            <Icon Name="clock-history" Size="20" Fill="#fff" class="me-2" AriaLabel="Historial" />
+            Historial de turnos
+        </a>
+        <button @onclick="HandleClickTelesalud" class="btn btn-secondary">
+            <Icon Name="camera-video" Size="20" Fill="#fff" class="me-2" AriaLabel="Telesalud" />
+            Telesalud
+        </button>
+    </div>
+
+    @if (turnos != null)
+    {
+        @if (turnos.Any())
+        {
+            <div class="turnos-futuros-section">
+                <div class="section-title-wrapper">
+                    <h2 class="section-title">
+                        <Icon Name="calendar-check" Size="24" Fill="#87b867" class="me-2" AriaLabel="Turnos" />
+                        Turnos Programados
+                    </h2>
+                </div>
+                <div class="turnos-futuros-grid">
+                    @foreach (var turno in turnos)
+                    {
+                        if (turno.EsTeleconsulta)
+                        {
+                            <TurnoTelesaludCard Turno="turno" OnCancel="HandleCancelarTurno" />
+                        }
+                        else if (turno.VideoConferencia)
+                        {
+                            <TurnoVideoconferenciaCard Turno="turno" OnCancel="HandleCancelarTurno" />
+                        }
+                        else
+                        {
+                            <TurnoPresencialCard Turno="turno" OnCancel="HandleCancelarTurno" />
+                        }
+                    }
+                </div>
+            </div>
+        }
+        else
+        {
+            <div class="calendar-icon-wrapper">
+                <Icon Name="calendar2-heart" Fill="#c33995" Size="32" />
+            </div>
+            <EmptyState Message="No tienes ningún turno programado" />
+        }
+    }
+</div>
+
+@code {
+    private List<Turno> turnos = new List<Turno>();
+
+    [CascadingParameter] IModalService Modal { get; set; } = default!;
+
+    protected override async Task OnAuthenticatedInitializedAsync()
+    {
+        var token = BackendToken;
+        if (string.IsNullOrEmpty(token))
+            return;
+
+        _spinnerService.Show();
+        try
+        {
+            turnos = await _obtenerTurnosUseCase.EjecutarAsync();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error al obtener los turnos");
+        }
+        finally
+        {
+            _spinnerService.Hide();
+        }
+    }
+
+    private async Task HandleCancelarTurno(Turno turno)
+    {
+        var options = new ModalOptions()
+        {
+            Size = ModalSize.Automatic,
+            Position = ModalPosition.TopCenter,
+            HideCloseButton = true,
+            HideHeader = true
+        };
+
+        var parameters = new ModalParameters()
+            .Add(nameof(MisTurnosCancelarConfirmar.FechaHoraTurno), turno.FechaHora.ToString("dd/MM/yyyy HH:mm"))
+            .Add(nameof(MisTurnosCancelarConfirmar.EfectorNombre), turno.Organizacion?.Nombre ?? "Efector desconocido")
+            .Add(nameof(MisTurnosCancelarConfirmar.TipoPrestacion), turno.TipoPrestacion?.Term ?? "Prestación desconocida")
+            .Add(nameof(MisTurnosCancelarConfirmar.IdTurno), turno.Id)
+            .Add(nameof(MisTurnosCancelarConfirmar.IdBloque), turno.BloqueId)
+            .Add(nameof(MisTurnosCancelarConfirmar.IdAgenda), turno.AgendaId)
+            .Add(nameof(MisTurnosCancelarConfirmar.EsTeleconsulta), turno.EsTeleconsulta)
+            .Add(nameof(MisTurnosCancelarConfirmar.NombrePaciente), turno.Paciente?.Nombre ?? "")
+            .Add(nameof(MisTurnosCancelarConfirmar.ApellidoPaciente), turno.Paciente?.Apellido ?? "");
+
+        Modal.Show<MisTurnosCancelarConfirmar>(parameters, options);
+    }
+
+    private async Task HandleClickTelesalud()
+    {
+        _ = Telemetry.TrackClickAsync("turnos/telesalud", "/misturnos");
+
+        // Verificar si ya tiene un turno de telesalud futuro activo
+        var turnosFuturos = turnos
+            .Where(t => t.EsTeleconsulta
+                && DateTimeHelper.ToArgentinaTime(t.FechaHora).Date >= DateTimeHelper.NowArgentina().Date
+                && (t.Estado == "programado" || t.Estado == "asignado" || t.Estado == "pendiente"))
+            .ToList();
+
+        if (turnosFuturos.Any())
+        {
+            // Si tiene un turno, mostrar modal con información y opción de cancelar
+            var turnoExistente = turnosFuturos.First();
+
+            var options = new ModalOptions()
+            {
+                Size = ModalSize.Medium,
+                Position = ModalPosition.TopCenter,
+                HideCloseButton = false,
+                HideHeader = false
+            };
+
+            var parameters = new ModalParameters()
+                .Add(nameof(MisTurnosTelesaludExistente.FechaTurno), turnoExistente.FechaHora.ToString("dd/MM/yyyy"))
+                .Add(nameof(MisTurnosTelesaludExistente.EfectorNombre), turnoExistente.Organizacion?.Nombre ?? "Efector desconocido")
+                .Add(nameof(MisTurnosTelesaludExistente.TipoPrestacion), turnoExistente.TipoPrestacion?.Term ?? "Prestación desconocida")
+                .Add(nameof(MisTurnosTelesaludExistente.IdTurno), turnoExistente.Id)
+                .Add(nameof(MisTurnosTelesaludExistente.IdBloque), turnoExistente.BloqueId)
+                .Add(nameof(MisTurnosTelesaludExistente.IdAgenda), turnoExistente.AgendaId)
+                .Add(nameof(MisTurnosTelesaludExistente.NombrePaciente), turnoExistente.Paciente?.Nombre ?? "")
+                .Add(nameof(MisTurnosTelesaludExistente.ApellidoPaciente), turnoExistente.Paciente?.Apellido ?? "");
+
+            Modal.Show<MisTurnosTelesaludExistente>(parameters, options);
+        }
+        else
+        {
+            // Si no tiene turno, navegar normalmente
+            Nav.NavigateTo("/turnosTelesalud");
+        }
+    }
+
+    private void TrackClick(string target, string route)
+    {
+        _ = Telemetry.TrackClickAsync(target, route);
+    }
+}

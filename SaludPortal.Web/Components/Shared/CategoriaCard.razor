@@ -1,0 +1,28 @@
+@using SaludPortal.Application.Models.HistoriaSalud
+@using Microsoft.AspNetCore.Components
+@using SaludPortal.Web.Components.Icons
+
+<div class="categoria-card" @onclick="HandleClick" tabindex="0">
+    <div class="categoria-content">
+        <span class="categoria-titulo">@Categoria.Titulo</span>
+        <span class="categoria-icon">
+            <Icon Name="chevron-right" Size="20" Fill="#00374c" AriaLabel="Ver categoría" />
+        </span>
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public CategoriaHistoriaSaludModel Categoria { get; set; } = new();
+
+    [Parameter]
+    public EventCallback<CategoriaHistoriaSaludModel> OnClick { get; set; }
+
+    private async Task HandleClick()
+    {
+        if (OnClick.HasDelegate)
+        {
+            await OnClick.InvokeAsync(Categoria);
+        }
+    }
+}

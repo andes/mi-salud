@@ -1,0 +1,60 @@
+﻿@page "/Vacunaciones"
+@page "/misvacunas"
+
+@attribute [Authorize]
+@using Microsoft.AspNetCore.Components.Authorization
+@using SaludPortal.Web.Components.Shared
+@using SaludPortal.Application.UseCases.Vacunaciones
+@using SaludPortal.Application.Models.Vacunaciones
+
+@inherits AuthenticatedComponentBase
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject BlazorSpinner.SpinnerService _spinnerService
+@inject ObtenerVacunacionesUseCase _obtenerVacunacionesUseCase
+
+<PageTitle>Mis vacunas - Mi Salud</PageTitle>
+
+<div class="vacunaciones-container">
+    <PageHeaderWithBack Title="Mis Vacunas"
+                        Subtitle="Historial de vacunaciones aplicadas"
+                        BackHref="/"
+                        BackAriaLabel="Volver al Inicio" />
+
+    @if (lstVacunaciones != null && lstVacunaciones.Any())
+    {
+        <div class="vacunaciones-section">
+            <SectionTitle Title="Vacunaciones" Icon="bi bi-syringe" />
+            <div class="vacunaciones-grid">
+                @foreach (var vacunacion in lstVacunaciones)
+                {
+                    <VacunacionCard Vacunacion="vacunacion" />
+                }
+            </div>
+        </div>
+    }
+    else
+    {
+        <EmptyState Message="No se encontraron vacunaciones registradas." />
+    }
+</div>
+
+@code {
+    private List<VacunacionModel> lstVacunaciones = new List<VacunacionModel>();
+
+    protected override async Task OnAuthenticatedInitializedAsync()
+    {
+        var token = BackendToken;
+        if (string.IsNullOrEmpty(token))
+            return;
+
+        _spinnerService.Show();
+        try
+        {
+            lstVacunaciones = await _obtenerVacunacionesUseCase.EjecutarAsync();
+        }
+        finally
+        {
+            _spinnerService.Hide();
+        }
+    }
+}

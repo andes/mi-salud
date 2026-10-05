@@ -1,0 +1,206 @@
+@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.JSInterop
+@using SaludPortal.Application.Models.Consentimiento
+@using SaludPortal.Application.UseCases.Consentimiento
+@using SaludPortal.Application.UseCases.Paciente
+@using SaludPortal.Web.Models
+@using SaludPortal.Web.Services
+
+@inject EvaluarConsentimientoProgramaUseCase EvaluarConsentimientoUseCase
+@inject GuardarRespuestaConsentimientoUseCase GuardarRespuestaUseCase
+@inject ObtenerPacienteUseCase ObtenerPacienteUseCase
+@inject IJSRuntime JS
+@inject ILogger<ConsentimientoProgramaCuidadoIntegralHost> Logger
+
+@if (_mostrarModal && _version is not null)
+{
+    <ConsentimientoProgramaCuidadoIntegral Titulo="@_version.Titulo"
+                                           Texto="@_version.Texto"
+                                           FormatoContenido="@_version.FormatoContenido"
+                                           Programa="@_version.Programa"
+                                           OnRespuesta="HandleRespuesta" />
+}
+else if (_mostrarAvisoNoElegible)
+{
+    <AvisoNoElegibleCuidar65 OnCerrar="HandleCerrarAviso" />
+}
+
+@code {
+    [CascadingParameter]
+    private Task<AuthenticationState>? AuthenticationState { get; set; }
+
+    private bool _mostrarModal;
+    private bool _mostrarAvisoNoElegible;
+    private bool _inicializado;
+    private bool _enCurso;
+    private string? _idPaciente;
+    private string? _dni;
+    private string? _sexo;
+    private DateTime? _fechaNacimiento;
+    private ConsentVersionModel? _version;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_inicializado || _enCurso || AuthenticationState is null)
+        {
+            return;
+        }
+
+        _enCurso = true;
+
+        try
+        {
+            var tienePendiente = await JS.InvokeAsync<bool>("authApi.tieneConsentimientoPendiente");
+            if (!tienePendiente)
+            {
+                _inicializado = true;
+                return;
+            }
+
+            var authState = await AuthenticationState;
+            var user = authState.User;
+
+            if (user.Identity?.IsAuthenticated != true)
+            {
+                _inicializado = true;
+                return;
+            }
+
+            _idPaciente = user.GetPacienteId();
+            _dni = user.GetDocumento();
+            _sexo = user.GetSexo();
+            _fechaNacimiento = user.GetFechaNacimiento();
+
+            if (string.IsNullOrWhiteSpace(_idPaciente) ||
+                string.IsNullOrWhiteSpace(_dni) ||
+                string.IsNullOrWhiteSpace(_sexo) ||
+                _fechaNacimiento == null)
+            {
+                _inicializado = true;
+                return;
+            }
+
+            var evaluacion = await ObtenerEvaluacionAsync();
+
+            if (!evaluacion.MostrarPopup && !evaluacion.MostrarAvisoNoElegible)
+            {
+                await JS.InvokeVoidAsync("authApi.resolverConsentimientoPendiente", _idPaciente);
+                _inicializado = true;
+                return;
+            }
+
+            if (evaluacion.MostrarPopup && evaluacion.Version is not null)
+            {
+                _version = evaluacion.Version;
+                _mostrarModal = true;
+                _inicializado = true;
+                StateHasChanged();
+                return;
+            }
+
+            if (evaluacion.MostrarAvisoNoElegible)
+            {
+                var yaEntendido = await JS.InvokeAsync<bool>("authApi.fueAvisoNoElegibleEntendido", _idPaciente);
+                if (!yaEntendido)
+                {
+                    _mostrarAvisoNoElegible = true;
+                    _inicializado = true;
+                    StateHasChanged();
+                }
+                else
+                {
+                    await JS.InvokeVoidAsync("authApi.resolverConsentimientoPendiente", _idPaciente);
+                    _inicializado = true;
+                }
+            }
+            else
+            {
+                _inicializado = true;
+            }
+        }
+        catch (JSDisconnectedException)
+        {
+            // Circuito desconectado: reintentar en el próximo render.
+        }
+        catch (OperationCanceledException)
+        {
+            // Navegación / cancelación de JSInterop: reintentar cuando el circuito esté listo.
+        }
+        catch (Exception ex)
+        {
+            _inicializado = true;
+            Logger.LogError(ex, "Error al consultar consentimiento del programa de cuidado integral");
+        }
+        finally
+        {
+            _enCurso = false;
+        }
+    }
+
+    private async Task<EvaluarConsentimientoResult> ObtenerEvaluacionAsync()
+    {
+        var cache = await JS.InvokeAsync<ConsentimientoEvaluacionCacheDto?>(
+            "authApi.obtenerEvaluacionConsentimientoCacheada",
+            _idPaciente);
+
+        if (cache is not null)
+        {
+            return cache.ToEvaluacionResult();
+        }
+
+        var evaluacion = await EvaluarConsentimientoUseCase.EjecutarAsync(
+            _idPaciente!,
+            _dni!,
+            _sexo!,
+            _fechaNacimiento);
+
+        if (evaluacion.MostrarPopup || evaluacion.MostrarAvisoNoElegible)
+        {
+            await JS.InvokeVoidAsync(
+                "authApi.guardarEvaluacionConsentimientoCacheada",
+                _idPaciente,
+                ConsentimientoEvaluacionCacheDto.FromEvaluacion(evaluacion));
+        }
+
+        return evaluacion;
+    }
+
+    private async Task HandleRespuesta(bool aceptado)
+    {
+        if (string.IsNullOrWhiteSpace(_idPaciente) || _version is null)
+        {
+            _mostrarModal = false;
+            return;
+        }
+
+        try
+        {
+            await GuardarRespuestaUseCase.EjecutarAsync(
+                _version.Programa,
+                _version.Version,
+                _idPaciente,
+                aceptado);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error al registrar consentimiento del programa de cuidado integral");
+        }
+        finally
+        {
+            _mostrarModal = false;
+            _version = null;
+            await JS.InvokeVoidAsync("authApi.resolverConsentimientoPendiente", _idPaciente);
+        }
+    }
+
+    private async Task HandleCerrarAviso()
+    {
+        if (!string.IsNullOrWhiteSpace(_idPaciente))
+        {
+            await JS.InvokeVoidAsync("authApi.marcarAvisoNoElegibleEntendido", _idPaciente);
+            await JS.InvokeVoidAsync("authApi.resolverConsentimientoPendiente", _idPaciente);
+        }
+
+        _mostrarAvisoNoElegible = false;
+    }
+}

@@ -1,0 +1,114 @@
+﻿@page "/historiasalud"
+@rendermode InteractiveServer
+
+@using Microsoft.AspNetCore.Components.Authorization
+@using SaludPortal.Web.Components.Shared
+@using SaludPortal.Web.Services
+@using SaludPortal.Application.UseCases.HistoriaSalud
+@using SaludPortal.Application.Models.HistoriaSalud
+@using AndesServices.Entities
+@using System.Linq
+
+@inject NavigationManager Navigation
+@inject IWebHostEnvironment Env
+@inject BlazorSpinner.SpinnerService _spinnerService
+@inject IJSRuntime JSRuntime
+@inherits AuthenticatedComponentBase
+@inject ObtenerCategoriasHistoriaSaludUseCase _obtenerCategoriasUseCase
+@inject ObtenerPrestacionesHistoriaSaludUseCase _obtenerPrestacionesUseCase
+@inject TelemetryService Telemetry
+
+<PageTitle>Historia de salud - Mi Salud</PageTitle>
+
+<div class="historia-salud-container">
+    <PageHeaderWithBack Title="Historia de Salud"
+                        Subtitle="Categorías de prestaciones médicas" 
+                        BackHref="/"
+                        BackAriaLabel="Volver al Inicio" />
+
+    @if (lstCategorias != null && lstCategorias.Any())
+    {
+        <div class="categorias-section">
+            <SectionTitle Title="Categorías" Icon="bi bi-clipboard2-heart" />
+            <div class="categorias-grid">
+                @foreach (var categoria in lstCategorias)
+                {
+                    <CategoriaCard Categoria="categoria" OnClick="IrACategoria" />
+                }
+            </div>
+        </div>
+    }
+    else
+    {
+        <EmptyState Message="No se encontraron categorías disponibles." />
+    }
+</div>
+
+@code {
+    private List<CategoriaHistoriaSaludModel> lstCategorias = new();
+
+    protected override async Task OnAuthenticatedInitializedAsync()
+    {
+        var token = BackendToken;
+        if (string.IsNullOrEmpty(token))
+            return;
+
+        _spinnerService.Show();
+        try
+        {
+            var categorias = await _obtenerCategoriasUseCase.EjecutarAsync();
+            lstCategorias = categorias.OrderBy(c => c.BusquedaPor).ToList();
+        }
+        finally
+        {
+            _spinnerService.Hide();
+        }
+    }
+
+    protected async Task BuscarHistoriaSalud(string idTipoPrestacion)
+    {
+        var token = BackendToken;
+        if (string.IsNullOrEmpty(token))
+            return;
+
+        var pacienteId = PacienteId;
+        if (string.IsNullOrEmpty(pacienteId))
+            return;
+
+        _spinnerService.Show();
+        try
+        {
+            await _obtenerPrestacionesUseCase.EjecutarAsync(idTipoPrestacion, pacienteId);
+        }
+        finally
+        {
+            _spinnerService.Hide();
+        }
+    }
+
+    private async Task IrACategoria(CategoriaHistoriaSaludModel categoria)
+    {
+        var expresionSnomed = categoria.ExpresionSnomed;
+        var titulo = categoria.Titulo;
+
+        if (string.IsNullOrWhiteSpace(expresionSnomed))
+            return;
+
+        _ = Telemetry.TrackClickAsync("historiasalud/categoria", "/historiasalud", new { expresionSnomed, titulo });
+
+        if (expresionSnomed == "103695000" && Env.IsDevelopment())
+        {
+            await JSRuntime.InvokeVoidAsync("open", Nav.BaseUri + "docs/Certificado médico OLAVE.pdf", "_blank");
+        }
+        else
+        {
+            if (expresionSnomed == "16076005")
+                Navigation.NavigateTo($"MisRecetas");
+            else
+            {
+                var encoded = Uri.EscapeDataString(expresionSnomed);
+                Navigation.NavigateTo($"/historiasalud/{encoded}");
+            }
+        }
+    }
+}

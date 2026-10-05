@@ -1,0 +1,32 @@
+﻿@page "/turnosmensajeconfirma"
+@rendermode InteractiveServer
+
+@using AndesServices.Entities
+@using Microsoft.AspNetCore.Components
+@using SaludPortal.Web.Components.Shared
+@using SaludPortal.Web.Components.Icons
+@inject MessageService MessageService
+
+<PageTitle>Turno confirmado - Mi Salud</PageTitle>
+
+<div class="turnos-mensaje-container">
+    <PageHeaderWithBack Title="Mis turnos"
+                        BackHref="/misturnos"
+                        BackText="Volver a mis turnos"
+                        BackAriaLabel="Volver a mis turnos" />
+
+    <div class="turnos-mensaje-card turnos-mensaje-success">
+        <div class="turnos-mensaje-icon-wrapper">
+            <Icon Name="check-circle" Size="64" Fill="#28a745" AriaLabel="Confirmado" />
+        </div>
+        <div class="turnos-mensaje-content">
+            <h2 class="turnos-mensaje-title">@MessageService.Title</h2>
+            @if (MessageService.Content != null && !string.IsNullOrWhiteSpace(MessageService.Content))
+            {
+                <div class="turnos-mensaje-body">
+                    @((MarkupString)MessageService.Content)
+                </div>
+            }
+        </div>
+    </div>
+</div>

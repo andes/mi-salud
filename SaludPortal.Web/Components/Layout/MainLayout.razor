@@ -1,0 +1,42 @@
+﻿@using Microsoft.AspNetCore.Components.Authorization
+@using SaludPortal.Web.Components.Shared
+@inherits LayoutComponentBase
+@* <script src="js/cookieMonitor.js"></script> *@
+@* @attribute [Authorize] *@
+@* <CascadingAuthenticationState>
+    <AuthorizeView>
+        <Authorized> *@
+            <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@@fortawesome/fontawesome-free@6.7.2/css/fontawesome.min.css">
+            <PageTitle>Salud Neuquén - Mi Salud</PageTitle>
+            <div class="page">
+                <div class="sidebar">
+                    <NavMenu />
+                </div>
+
+                <main>
+                    <div class="top-row px-4">
+                        <div class="top-row__title">
+                            Mi Salud - Neuquén
+                        </div>
+                        <div class="logo-container">
+                            <img src="../images/neuquen-logo.svg" alt="logo Provincia del Neuquén">
+                            <img src="../images/gobierno-neuquen.svg" alt="Logo Gobierno de la Provincia del Neuquén">
+                        </div>
+                    </div>
+                    <article class="content px-4">
+                        @Body
+                    </article>
+                </main>
+            </div>
+            <Spinner Icon="loading-light.svg" Type="@SpinnerType.Icon" Text="Cargando..."></Spinner>
+            <div id="blazor-error-ui">
+                Se produjo un error no manejado.
+                <a href="" class="reload">Recargar</a>
+                <a class="dismiss">🗙</a>
+            </div>
+            <script src="https://cdn.jsdelivr.net/npm/@@fortawesome/fontawesome-free@6.7.2/js/all.min.js"></script>
+            <ConsentimientoProgramaCuidadoIntegralHost @rendermode="new InteractiveServerRenderMode(prerender: false)" />
+            <AppToastHost />
+@*         </Authorized>
+    </AuthorizeView>
+</CascadingAuthenticationState> *@

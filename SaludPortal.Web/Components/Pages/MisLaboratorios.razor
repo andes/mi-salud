@@ -1,0 +1,267 @@
+﻿@page "/mislaboratorios"
+
+@rendermode InteractiveServer
+@using AndesServices.Entities
+@using SaludPortal.Application.Models.Laboratorios
+@using SaludPortal.Application.UseCases.Laboratorios
+@using SaludPortal.Application.Utils
+@using SaludPortal.Web.Components.Shared
+
+@inject SaludConfiguracion SaludConfiguracion
+@inject IJSRuntime JSRuntime
+@inject BlazorSpinner.SpinnerService _spinnerService
+@inject ObtenerTodosLosLaboratoriosUseCase _obtenerLaboratoriosUseCase
+@inject DescargarInformeLaboratorioUseCase _descargarInformeUseCase
+@inject ILogger<MisLaboratorios> Logger
+
+@inherits AuthenticatedComponentBase
+
+<PageTitle>Mis laboratorios - Mi Salud</PageTitle>
+
+<div class="laboratorios-container">
+    <PageHeaderWithBack Title="Mis Laboratorios"
+                        Subtitle="Historial de informes de laboratorio"
+                        BackHref="/"
+                        BackAriaLabel="Volver al inicio" />
+
+    @if (_laboratorios != null && _visibleLabs != null && _visibleLabs.Any())
+    {
+        <div class="laboratorios-section">
+            <SectionTitle Title="Informes de Laboratorio" Icon="bi bi-flask-vial" />
+            <div class="laboratorios-grid">
+                @foreach (var lab in _visibleLabs)
+                {
+                    @if (lab != null && !string.IsNullOrEmpty(lab.Laboratorio))
+                    {
+                        <LaboratorioCard Laboratorio="lab" OnDownload="@((LaboratorioModel l) => DownloadLaboratorio(l))" />
+                    }
+                }
+            </div>
+            <div id="pdffile"></div>
+            <div id="load-more-sentinel" style="height: 1px;"></div>
+            @if (_isLoadingMore && _laboratorios != null && _loadedCount < _laboratorios.Count)
+            {
+                <div class="text-center text-secondary my-2" aria-live="polite">Cargando…</div>
+            }
+        </div>
+    }
+    else
+    {
+        <EmptyState Message="No existen datos para mostrar" />
+    }
+</div>
+
+<script type="text/javascript">
+
+    function openPdfLab(archivo) {
+    const pdfData = "data:application/pdf;base64," + archivo;
+
+    const a = document.createElement("a");
+    document.body.appendChild(a);
+    a.href = pdfData;
+    a.download = "laboratorio.pdf";
+    a.target = "_self";
+    a.click();
+    }
+
+    window.InfiniteScroll = {
+        observer: null,
+        observe: function (elementId, dotnetRef, callback) {
+            const el = document.getElementById(elementId);
+            if (!el) return;
+
+            if (this.observer) {
+                this.observer.disconnect();
+                this.observer = null;
+            }
+
+            const options = { root: null, rootMargin: '0px', threshold: 0.1 };
+            let ticking = false;
+
+            this.observer = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        if (ticking) return;
+                        ticking = true;
+                        setTimeout(() => {
+                            dotnetRef.invokeMethodAsync(callback).catch(() => { });
+                            ticking = false;
+                        }, 100);
+                    }
+                });
+            }, options);
+
+            this.observer.observe(el);
+        },
+        unobserve: function (elementId) {
+            if (this.observer) {
+                const el = document.getElementById(elementId);
+                if (el) this.observer.unobserve(el);
+                this.observer.disconnect();
+                this.observer = null;
+            }
+        }
+    };
+</script>
+
+@code {
+    private List<LaboratorioModel>? _laboratorios;
+
+    // Estado de paginación en cliente (infinite scroll)
+    private List<LaboratorioModel> _visibleLabs = new();
+    private int _pageSize = 20;
+    private int _loadedCount = 0;
+    private bool _isLoadingMore = false;
+    private DotNetObjectReference<MisLaboratorios>? _dotNetRef;
+    private bool _observerAttached = false;
+
+    protected override async Task OnAuthenticatedInitializedAsync()
+    {
+        var pacienteId = PacienteId;
+        var documento = Documento;
+        if (string.IsNullOrEmpty(pacienteId) || string.IsNullOrEmpty(documento))
+            return;
+
+        string fechaDesde = DateTimeHelper.NowArgentina().AddYears(SaludConfiguracion.fechaDesde * (-1)).ToString("yyyyMMdd");
+
+        _spinnerService.Show();
+        _laboratorios = await _obtenerLaboratoriosUseCase.EjecutarAsync(pacienteId, documento, fechaDesde);
+        _spinnerService.Hide();
+
+        await ResetAndInitVisibleAsync();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            _dotNetRef = DotNetObjectReference.Create(this);
+            await EnsureObserverAsync();
+        }
+    }
+
+    [JSInvokable]
+    public async Task OnLoadMore()
+    {
+        await LoadMoreAsync();
+    }
+
+    private async Task ResetAndInitVisibleAsync()
+    {
+        _pageSize = SaludConfiguracion.misLaboratoriosPageSize > 0 ? SaludConfiguracion.misLaboratoriosPageSize : 20;
+
+        _visibleLabs.Clear();
+        _loadedCount = 0;
+
+        await LoadMoreAsync(reset: true);
+        await EnsureObserverAsync();
+        StateHasChanged();
+    }
+
+    private async Task EnsureObserverAsync()
+    {
+        if (!_observerAttached && _laboratorios != null && _loadedCount < _laboratorios.Count && _dotNetRef is not null)
+        {
+            await JSRuntime.InvokeVoidAsync("InfiniteScroll.observe", "load-more-sentinel", _dotNetRef, "OnLoadMore");
+            _observerAttached = true;
+        }
+        else if (_laboratorios != null && _loadedCount >= _laboratorios.Count)
+        {
+            await JSRuntime.InvokeVoidAsync("InfiniteScroll.unobserve", "load-more-sentinel");
+            _observerAttached = false;
+        }
+    }
+
+    private async Task LoadMoreAsync(bool reset = false)
+    {
+        if (_laboratorios == null) return;
+        if (_isLoadingMore) return;
+
+        _isLoadingMore = true;
+        try
+        {
+            var total = _laboratorios.Count;
+            var remaining = total - _loadedCount;
+
+            if (remaining <= 0)
+            {
+                if (_observerAttached)
+                {
+                    try
+                    {
+                        await JSRuntime.InvokeVoidAsync("InfiniteScroll.unobserve", "load-more-sentinel");
+                    }
+                    catch { }
+                    _observerAttached = false;
+                }
+                return;
+            }
+
+            var toTake = Math.Min(_pageSize, remaining);
+            if (toTake > 0)
+            {
+                _visibleLabs.AddRange(_laboratorios.Skip(_loadedCount).Take(toTake));
+                _loadedCount += toTake;
+            }
+
+            if (_loadedCount >= total && _observerAttached)
+            {
+                try
+                {
+                    await JSRuntime.InvokeVoidAsync("InfiniteScroll.unobserve", "load-more-sentinel");
+                }
+                catch { }
+                _observerAttached = false;
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger?.LogError(ex, "Error en LoadMoreAsync");
+        }
+        finally
+        {
+            _isLoadingMore = false;
+            StateHasChanged();
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        try
+        {
+            await JSRuntime.InvokeVoidAsync("InfiniteScroll.unobserve", "load-more-sentinel");
+        }
+        catch { }
+        _dotNetRef?.Dispose();
+    }
+
+    async Task DownloadLaboratorio(LaboratorioModel laboratorio)
+    {
+        _spinnerService.Show();
+        try
+        {
+            var archivo = await _descargarInformeUseCase.EjecutarAsync(
+                laboratorio.IdProtocolo,
+                laboratorio.Tipo ?? "",
+                Documento,
+                laboratorio.CdaAdjuntos);
+
+            if (archivo == null || archivo.Length == 0)
+            {
+                await JSRuntime.InvokeVoidAsync("alert", "No se encontró el archivo del laboratorio.");
+                return;
+            }
+
+            await JSRuntime.InvokeVoidAsync("openPdfLab", Convert.ToBase64String(archivo));
+        }
+        catch (Exception ex)
+        {
+            Logger?.LogError(ex, "Error descargando laboratorio");
+            await JSRuntime.InvokeVoidAsync("alert", "Error al descargar el laboratorio.");
+        }
+        finally
+        {
+            _spinnerService.Hide();
+        }
+    }
+}

@@ -1,0 +1,21 @@
+.card-header {
+    background-color: #2b3e4c;
+    color: white;
+    min-height: 80px;
+    display: flex;
+    align-items: center;
+}
+
+.card-header .header-icon {
+    font-size: 2rem;
+}
+
+.card-header h2 {
+    color: white;
+    font-size: 1.2rem;
+    font-weight: 500;
+}
+
+.card-header p {
+    color: white;
+}

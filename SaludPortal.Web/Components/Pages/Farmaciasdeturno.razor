@@ -1,0 +1,116 @@
+﻿@page "/Farmaciasdeturno"
+@rendermode InteractiveServer
+
+@using Microsoft.AspNetCore.Components.Authorization
+@using SaludPortal.Web.Components.Shared
+@using System.Linq
+@using SaludPortal.Application.Models.Farmacias
+@using SaludPortal.Application.UseCases.Farmacias
+@using SaludPortal.Application.UseCases.Paciente
+@using SaludPortal.Web.Models
+
+@using SaludPortal.Web.Services
+@inject TelemetryService Telemetry
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject ObtenerFarmaciasTurnoUseCase _obtenerFarmaciasTurnoUseCase
+@inject ObtenerLocalidadesDeFarmaciasUseCase _obtenerLocalidadesDeFarmaciasUseCase
+@inject ObtenerPacienteUseCase _obtenerPacienteUseCase
+@inject BlazorSpinner.SpinnerService _spinnerService
+@inject VMFarmaciasTurno Model
+@inherits AuthenticatedComponentBase
+
+<PageTitle>Farmacias de turno - Mi Salud</PageTitle>
+
+<div class="farmacias-container">
+    <PageHeaderWithBack Title="Farmacias de Turno" 
+                        Subtitle="Farmacias disponibles por localidad"
+                        BackHref="/"
+                        BackAriaLabel="Volver al Inicio" />
+
+    <div class="farmacias-filters">
+        <div class="filter-group">
+            <label for="localidades" class="filter-label">Localidad:</label>
+            <InputSelect id="localidades" @bind-Value="Model.LocalidadId" @bind-Value:after="BuscarFarmacias" class="form-select" aria-label="Seleccione una localidad">
+                <option value="">(Seleccione una localidad)</option>
+                @if (Model.LstLocalidad != null)
+                {
+                    @foreach (var localidad in Model.LstLocalidad.OrderBy(l => l.Nombre))
+                    {
+                        <option value="@localidad.LocalidadId">@localidad.Nombre</option>
+                    }
+                }
+            </InputSelect>
+        </div>
+    </div>
+
+    @if (_farmacias != null && _farmacias.Any())
+    {
+        <div class="farmacias-section">
+            <SectionTitle Title="Farmacias Disponibles" Icon="bi bi-farmaciasturno" />
+            <div class="farmacias-grid">
+                @foreach (Farmacia unaFarmacia in _farmacias)
+                {
+                    <FarmaciaCard Farmacia="unaFarmacia" />
+                }
+            </div>
+        </div>
+    }
+    else if (_farmacias != null && !_farmacias.Any())
+    {
+        <EmptyState Message="No se encontraron farmacias de turno para la localidad seleccionada." />
+    }
+    else
+    {
+        <EmptyState Message="Seleccione una localidad para ver las farmacias de turno disponibles." />
+    }
+</div>
+@code {
+    private List<Farmacia>? _farmacias;
+
+    protected override async Task OnAuthenticatedInitializedAsync()
+    {
+        _spinnerService.Show();
+        Model.LstLocalidad = await _obtenerLocalidadesDeFarmaciasUseCase.EjecutarAsync();
+
+        // obtener la direccion del paciente
+        var paciente = await _obtenerPacienteUseCase.EjecutarAsync(PacienteId);
+        var direccionPaciente = paciente?.ObtenerDireccionPrioritaria();
+
+        var ubicacionPaciente = direccionPaciente?.Ubicacion;
+        var localidadPaciente = direccionPaciente?.Ubicacion?.Localidad;
+        var provinciaPaciente = direccionPaciente?.Ubicacion?.Provincia;
+        var nombreProvinciaPaciente = provinciaPaciente?.Nombre?.Trim().ToLower() ?? "";
+
+        // Valida que la provincia del paciente sea Neuquén
+        var provinciaPacienteEsNeuquen = (nombreProvinciaPaciente == "neuquén" || nombreProvinciaPaciente == "neuquen");
+
+        if (Model.LstLocalidad != null && provinciaPacienteEsNeuquen)
+        {
+            string? localidadId = Model.LstLocalidad
+                .Where(l => l.Nombre.Trim().ToLower() == localidadPaciente?.Nombre?.Trim().ToLower())
+                .Select(l => l.LocalidadId)
+                .FirstOrDefault();
+
+            if (localidadId != null)
+            {
+                Model.LocalidadId = localidadId;
+                _farmacias = await _obtenerFarmaciasTurnoUseCase.EjecutarAsync(localidadId);
+            }
+        }
+        _spinnerService.Hide();
+    }
+
+    protected async Task BuscarFarmacias()
+    {
+        if (User.Identity?.IsAuthenticated != true)
+        {
+            var returnUrl = Nav.ToBaseRelativePath(Nav.Uri);
+            Nav.NavigateTo($"/login", true);
+        }
+
+        _ = Telemetry.TrackClickAsync("farmacias/buscar-localidad", metadata: new { localidadId = Model.LocalidadId });
+        _spinnerService.Show();
+        _farmacias = await _obtenerFarmaciasTurnoUseCase.EjecutarAsync(Model.LocalidadId);
+        _spinnerService.Hide();
+    }
+}

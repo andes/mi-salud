@@ -1,0 +1,177 @@
+﻿@page "/user/login"
+@page "/login"
+@layout LoginLayout
+@attribute [AllowAnonymous]
+@rendermode InteractiveServer
+
+@using SaludPortal.Web.Models.AccountViewModels
+@using SaludPortal.Application.UseCases.Auth
+@using SaludPortal.Web.Components.Icons
+@using SaludPortal.Web.Components.Shared
+@using Microsoft.AspNetCore.Components.Forms
+@using System.Linq
+
+@inject NavigationManager Nav
+@inject CustomAuthenticationStateProvider AuthProvider
+@inject ILogger<LogIn> Logger
+@inject IJSRuntime JS
+@inject ValidarConexionXroadssUseCase ValidarConexionXroadssUseCase
+@inject AppToastService ToastService
+@inject TelemetryService Telemetry
+
+<PageTitle>Ingresar - Mi Salud</PageTitle>
+
+<div class="login-container">
+    <div class="login-card">
+        <div class="login-header">
+            <h2 class="login-title">Login</h2>
+        </div>
+
+        <div class="login-body">
+            <EditForm Model="_model" OnValidSubmit="DoLogin" class="login-form" @ref="_editForm">
+                <DataAnnotationsValidator />
+                @* <ValidationSummary class="login-validation-summary" /> *@
+
+                <InputEmailField @bind-Value="_model.Email"
+                                Placeholder="Ingresa tu email"
+                                AriaLabel="Usuario"
+                                HasError="@HasFieldError(nameof(_model.Email))"
+                                ValidationFor="@(() => _model.Email)" />
+
+                <InputTextField @bind-Value="_model.Password"
+                                Id="txtPassword"
+                                Type="password"
+                                IconName="lock"
+                                Placeholder="Contraseña"
+                                AriaLabel="Contraseña"
+                                ShowPasswordToggle="true"
+                                HasError="@HasFieldError(nameof(_model.Password))"
+                                ValidationFor="@(() => _model.Password)" />
+
+                <div class="login-remember">
+                    <InputCheckbox @bind-Value="_model.RememberMe" id="rememberMe" class="login-checkbox" />
+                    <label for="rememberMe" class="login-checkbox-label">Recordarme</label>
+                </div>
+
+                @if (!string.IsNullOrWhiteSpace(_error))
+                {
+                    <div class="login-error" role="alert">
+                        <Icon Name="exclamation-triangle" Size="18" Fill="#dc3545" class="me-2" AriaLabel="Error" />
+                        <span>@_error</span>
+                    </div>
+                }
+
+                <ButtonPrimary Type="submit"
+                               Text="@(_busy ? "Iniciando..." : "Iniciar sesión")"
+                               Disabled="@_busy"
+                               AriaLabel="@(_busy ? "Iniciando sesión..." : "Iniciar sesión")" />
+            </EditForm>
+            <div class="forgot-password-link">
+                <a href="/olvidocontrasenia" class="login-link" @onclick="GoToOlvidoContrasenia" @onclick:preventDefault>¿Olvidaste tu contraseña?</a>
+            </div>
+        </div>
+
+        <div class="login-footer">
+            <ButtonPrimaryOutlined OnClick="GoToActivacion"
+                                   Text="Ingresar cód. activación"
+                                   AriaLabel="Ingresar código de activación"
+                                   Size="sm" />
+            <ButtonPrimaryOutlined OnClick="Register"
+                                   Text="Registrarse"
+                                   AriaLabel="Registrarse"
+                                   Size="sm" />
+        </div>
+    </div>
+</div>
+
+@code {
+    private readonly LoginViewModel _model = new();
+    private string? _error;
+    private bool _busy;
+    private EditForm? _editForm;
+    private bool _xroadssConnectionChecked;
+
+    [Parameter, SupplyParameterFromQuery]
+    public string? ReturnUrl { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CheckXroadssConnectionAsync();
+    }
+
+    private bool HasFieldError(string fieldName)
+    {
+        return _editForm?.EditContext?.GetValidationMessages(new FieldIdentifier(_model, fieldName)).Any() ?? false;
+    }
+
+    private async Task CheckXroadssConnectionAsync()
+    {
+        if (_xroadssConnectionChecked)
+        {
+            return;
+        }
+
+        _xroadssConnectionChecked = true;
+
+        var xroadssConnection = await ValidarConexionXroadssUseCase.EjecutarAsync();
+        if (!xroadssConnection)
+        {
+            ToastService.ShowError("Error al validar conexión con xroadss.", 10000);
+        }
+    }
+
+
+    private async Task DoLogin()
+    {
+        _busy = true; _error = null;
+        try
+        {
+            await Telemetry.TrackClickAsync("login/submit", "/login");
+            var result = await JS.InvokeAsync<LoginResult>("authApi.login", new
+            {
+                Email = _model.Email,
+                Password = _model.Password,
+                RememberMe = _model.RememberMe
+            });
+
+            if (result.Ok)
+            {
+                Nav.NavigateTo(ReturnUrl ?? "/home", forceLoad: true);
+            }
+            else
+            {
+                _error = result.Message ?? "Credenciales inválidas";
+            }
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally { _busy = false; }
+    }
+    private class LoginResult
+    {
+        public bool Ok { get; set; }
+        public int Status { get; set; }
+        public string? Message { get; set; }
+    }
+
+    private async Task Register()
+    {
+        await Telemetry.TrackClickAsync("login/registro", "/login");
+        Nav.NavigateTo("/registro", true);
+    }
+
+    private async Task GoToOlvidoContrasenia()
+    {
+        await Telemetry.TrackClickAsync("login/olvido", "/login");
+        Nav.NavigateTo("/olvidocontrasenia", true);
+    }
+
+    private async Task GoToActivacion()
+    {
+        await Telemetry.TrackClickAsync("login/activacion", "/login");
+        Nav.NavigateTo("/ingresar-codigo-activacion");
+    }
+}
+<script src="../js/auth.js"></script>

@@ -1,0 +1,140 @@
+﻿@using AndesServices.Entities
+@inject NavigationManager Nav
+@rendermode InteractiveServer
+@using SaludPortal.Web.Components.Shared
+@using SaludPortal.Web.Models.AccountViewModels
+@inject AuthenticationStateProvider AuthStateProvider
+@inject IHttpClientFactory HttpClientFactory
+@inject ILogger<UserMenu> Logger
+@inject IJSRuntime JS
+
+<div class="container">
+    <div class="d-flex justify-content-center h-100">
+        <div class="card">
+            <div class="card-header">
+                <h3>Iniciar sesión</h3>
+            </div>
+            <div class="card-body">
+                <EditForm Model="LoginForm" OnValidSubmit="SubmitLogin" class="login-form">
+                    <DataAnnotationsValidator />
+                    <ValidationSummary />
+                    <div class="input-group form-group">
+                        <div class="input-group-prepend" style="margin-bottom:0.6px;">
+                            <span class="input-group-text"><i class="fas fa-user"></i></span>
+                        </div>
+                        <input id="txtUsuario" @bind="LoginForm.Email" type="text" class="form-control" placeholder="usuario">
+
+                    </div>
+                    <div class="input-group form-group">
+                        <div class="input-group-prepend">
+                            <span class="input-group-text"><i class="fas fa-key"></i></span>
+                        </div>
+                        <input id="txtPassword" @bind="LoginForm.Password" type="password" class="form-control" placeholder="contraseña">
+                    </div>
+                    <div class="row align-items-center remember">
+                        <input @bind="LoginForm.RememberMe" type="checkbox">Recordarme
+                    </div>
+                    <div class="form-group">
+                        <div class="form-label">
+                            <label class="badge bg-danger" style="max-width:250px;white-space:unset;">@lblResultadoLogin</label>
+                        </div>
+                        <input type="submit" value="Iniciar sesión" class="btn float-right login_btn">
+                    </div>
+                </EditForm>
+            </div>
+            <div class="card-footer">
+                <div class="d-flex justify-content-center links">
+                    <span style="color:#fff;">No tenés cuenta?</span><a style="cursor:pointer;text-decoration:underline;" @onclick="Register"> Crear cuenta</a>
+                </div>
+                <div class="d-flex justify-content-center links">
+                    <a href="#">Olvidaste tu contraseña?</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+
+    [SupplyParameterFromForm]
+    private LoginViewModel LoginForm { get; set; } = new();
+
+    [Parameter]
+    public string? ReturnUrl { get; set; }
+    Ref<string> lblResultadoLogin = string.Empty;
+
+    private async Task SubmitLogin()
+    {
+        if (string.IsNullOrEmpty(LoginForm.Email) || string.IsNullOrEmpty(LoginForm.Password))
+        {
+            return;
+        }
+        lblResultadoLogin = string.Empty;
+
+        var loginRequest = new LoginViewModel
+        {
+            Email = LoginForm.Email,
+            Password = LoginForm.Password,
+            RememberMe = LoginForm.RememberMe
+        };
+        try
+        {
+            var result = await JS.InvokeAsync<LoginJsResult>("authApi.login", loginRequest);
+
+            if (result.Ok)
+            {
+                Nav.NavigateTo(ReturnUrl ?? "/", forceLoad: true);
+            }
+            else
+            {
+                lblResultadoLogin = result.Data?.message ?? "Login fallido";
+                Logger.LogWarning("Login fallo: {Status} {Raw}", result.Status, result.Raw);
+            }
+            // }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error durante el inicio de sesión");
+            lblResultadoLogin = "Ocurrió un error durante el inicio de sesión";
+        }
+        // finally
+        // {
+        //     isLoading = false;
+        // }
+    }
+    private class LoginJsResult
+    {
+        public bool Ok { get; set; }
+        public int Status { get; set; }
+        public dynamic? Data { get; set; }
+        public string? Raw { get; set; }
+    }
+
+    // [Inject] private IJSRuntime JSRuntime { get; set; }
+
+    // private async Task VerifyCookiesInBrowser()
+    // {
+    //     try
+    //     {
+    //         await JSRuntime.InvokeVoidAsync("eval", @"
+    //         console.log('Cookies actuales:', document.cookie);
+    //         console.log('All cookies:', document.cookie.split(';').map(c => c.trim()));
+    //     ");
+    //     }
+    //     catch (Exception ex)
+    //     {
+    //         Logger.LogError(ex, "Error verificando cookies");
+    //     }
+    // }
+
+    private class LoginResult
+    {
+        public string? Token { get; set; }
+        public string? Message { get; set; }
+    }
+
+    private async Task Register()
+    {
+        Nav.NavigateTo("/registerqr", true);
+    }
+}

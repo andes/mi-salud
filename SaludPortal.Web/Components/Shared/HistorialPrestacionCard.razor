@@ -1,0 +1,171 @@
+@using SaludPortal.Application.Models.HistoriaSalud
+@using AndesServices.Entities
+@using Microsoft.AspNetCore.Components
+@using SaludPortal.Web.Components.Icons
+@using SaludPortal.Application.Utils
+@using System.Text.Json
+@using System.Linq
+
+@inject TelemetryService Telemetry
+
+<div class="prestacion-card" tabindex="0">
+    <div class="prestacion-header">
+        <span class="prestacion-tipo">@(Prestacion.Solicitud?.TipoPrestacion?.Term ?? "Prestación")</span>
+        <div class="prestacion-actions">
+            @if (OnViewImage.HasDelegate)
+            {
+                <div class="prestacion-action" @onclick="HandleViewImage" @onclick:stopPropagation="true" title="Ver imagen">
+                    <Icon Name="eye" Size="24" Fill="#00374c" AriaLabel="Ver imágen" />
+                </div>
+            }
+            @if (OnCopyLink.HasDelegate)
+            {
+                <div class="prestacion-action @(LinkCopied ? "link-copied" : "")" @onclick="HandleCopyLink" @onclick:stopPropagation="true" title="@(LinkCopied ? "¡Enlace copiado!" : "Copiar enlace de imágen")">
+                    <Icon Name="@(LinkCopied ? "check-circle" : "link-45deg")" Size="24" Fill="@(LinkCopied ? "#87b867" : "#00374c")" AriaLabel="@(LinkCopied ? "Enlace copiado" : "Copiar enlace de imágen")" />
+                </div>
+            }
+            @if (OnDownload.HasDelegate)
+            {
+                <div class="prestacion-action" @onclick="HandleDownload" @onclick:stopPropagation="true" title="Descargar PDF">
+                    <Icon Name="cloud-download" Size="24" Fill="#00374c" class="download-icon" AriaLabel="Descargar PDF" />
+                </div>
+            }
+        </div>
+    </div>
+    
+    <div class="prestacion-body">
+        @if (Prestacion.Solicitud?.Organizacion != null && !string.IsNullOrWhiteSpace(Prestacion.Solicitud.Organizacion.Nombre))
+        {
+            <div class="prestacion-info">
+                <span class="prestacion-label">
+                    <Icon Name="hospital" Size="16" Fill="#666" class="me-1" AriaLabel="Institución" />
+                    Institución:
+                </span>
+                <span class="prestacion-value prestacion-institucion">@Prestacion.Solicitud.Organizacion.Nombre</span>
+            </div>
+        }
+
+        @if (Prestacion.Ejecucion?.Fecha != null)
+        {
+            <div class="prestacion-info">
+                <span class="prestacion-label">Fecha:</span>
+                <span class="prestacion-value">@GetFechaFormateada()</span>
+            </div>
+        }
+
+        @if (Prestacion.Solicitud?.Profesional != null)
+        {
+            <div class="prestacion-info">
+                <span class="prestacion-label">Profesional:</span>
+                <span class="prestacion-value">@(Prestacion.Solicitud.Profesional.Nombre ?? "Sin datos") @(Prestacion.Solicitud.Profesional.Apellido ?? "Sin datos")</span>
+            </div>
+            @if (!string.IsNullOrWhiteSpace(Prestacion.Solicitud.Profesional.Documento))
+            {
+                <div class="prestacion-info">
+                    <span class="prestacion-label">Documento:</span>
+                    <span class="prestacion-value">@Prestacion.Solicitud.Profesional.Documento</span>
+                </div>
+            }
+        }
+
+        @if (Prestacion.Solicitud?.Registros != null && Prestacion.Solicitud.Registros.Any())
+        {
+            <div class="prestacion-section">
+                <h4 class="prestacion-section-title">Detalles de Solicitud</h4>
+                @foreach (var registro in Prestacion.Solicitud.Registros)
+                {
+                    @if (registro.Valor is { } ve && ve.ValueKind == JsonValueKind.Object)
+                    {
+                        @if (ve.TryGetProperty("solicitudPrestacion", out _))
+                        {
+                            var sol = ve.Deserialize<WrapperSolicitudPrestacion>();
+                            @if (sol?.solicitudPrestacion != null)
+                            {
+                                <div class="prestacion-details">
+                                    @if (!string.IsNullOrWhiteSpace(sol.solicitudPrestacion.prestacionSolicitada?.term))
+                                    {
+                                        <div class="prestacion-detail-item">
+                                            <span class="prestacion-detail-label">Solicitud:</span>
+                                            <span class="prestacion-detail-value">@sol.solicitudPrestacion.prestacionSolicitada.term</span>
+                                        </div>
+                                    }
+                                    @if (!string.IsNullOrWhiteSpace(sol.solicitudPrestacion.motivo))
+                                    {
+                                        <div class="prestacion-detail-item">
+                                            <span class="prestacion-detail-label">Motivo:</span>
+                                            <span class="prestacion-detail-value">@sol.solicitudPrestacion.motivo</span>
+                                        </div>
+                                    }
+                                    @if (!string.IsNullOrWhiteSpace(sol.solicitudPrestacion.indicaciones))
+                                    {
+                                        <div class="prestacion-detail-item">
+                                            <span class="prestacion-detail-label">Indicaciones:</span>
+                                            <span class="prestacion-detail-value">@sol.solicitudPrestacion.indicaciones</span>
+                                        </div>
+                                    }
+                                </div>
+                            }
+                        }
+                    }
+                }
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public PrestacionHistoriaSaludModel Prestacion { get; set; } = new();
+
+    [Parameter]
+    public EventCallback<PrestacionHistoriaSaludModel> OnDownload { get; set; }
+
+    [Parameter]
+    public EventCallback<PrestacionHistoriaSaludModel> OnViewImage { get; set; }
+
+    [Parameter]
+    public EventCallback<PrestacionHistoriaSaludModel> OnCopyLink { get; set; }
+
+    [Parameter]
+    public bool LinkCopied { get; set; }
+
+    private string GetFechaFormateada()
+    {
+        if (Prestacion.Ejecucion?.Fecha != null)
+        {
+            var fecha = DateTimeHelper.ToArgentinaTime(Prestacion.Ejecucion.Fecha);
+            if (fecha.HasValue)
+            {
+                return $"{fecha.Value:dd/MM/yyyy} {fecha.Value:HH:mm}";
+            }
+        }
+        return "-";
+    }
+
+    private async Task HandleDownload()
+    {
+        if (OnDownload.HasDelegate)
+        {
+            await OnDownload.InvokeAsync(Prestacion);
+            _ = Telemetry.TrackPrestacionPdfDownloadAsync(Prestacion.Id ?? "", Prestacion.Solicitud?.TipoPrestacion?.Term ?? "");
+        }
+    }
+
+    private async Task HandleViewImage()
+    {
+        if (OnViewImage.HasDelegate)
+        {
+            await OnViewImage.InvokeAsync(Prestacion);
+            _ = Telemetry.TrackPrestacionViewImageAsync(Prestacion.Id ?? "", Prestacion.Solicitud?.TipoPrestacion?.Term ?? "");
+        }
+    }
+
+    private async Task HandleCopyLink()
+    {
+        if (OnCopyLink.HasDelegate)
+        {
+            await OnCopyLink.InvokeAsync(Prestacion);
+            _ = Telemetry.TrackPrestacionCopyLinkAsync(Prestacion.Id ?? "", Prestacion.Solicitud?.TipoPrestacion?.Term ?? "");
+        }
+    }
+}

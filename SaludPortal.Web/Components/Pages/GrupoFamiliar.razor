@@ -1,0 +1,67 @@
+﻿@page "/grupofamiliar"
+@rendermode InteractiveServer
+
+@using SaludPortal.Web.Components.Shared
+@using SaludPortal.Application.UseCases.GrupoFamiliar
+@using PacienteEntity = AndesServices.Entities.Paciente
+
+@inherits AuthenticatedComponentBase
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject BlazorSpinner.SpinnerService _spinnerService
+@inject ObtenerGrupoFamiliarUseCase _obtenerGrupoFamiliarUseCase
+
+<PageTitle>Grupo familiar - Mi Salud</PageTitle>
+
+<div class="grupo-familiar-container">
+    <PageHeaderWithBack Title="Grupo Familiar"
+                        Subtitle="Información personal y relaciones familiares"
+                        BackHref="/"
+                        BackAriaLabel="Volver al Inicio" />
+
+    @if (unPaciente != null)
+    {
+        <div class="paciente-section">
+            <SectionTitle Title="Mis Datos" />
+            <PacienteInfoCard Paciente="unPaciente" />
+        </div>
+
+        <div class="relaciones-section">
+            <SectionTitle Title="Relaciones Familiares" />
+            @if (unPaciente.relaciones != null && unPaciente.relaciones.Any())
+            {
+                <div class="relaciones-grid">
+                    @foreach (var relacion in unPaciente.relaciones)
+                    {
+                        @if (relacion != null)
+                        {
+                            <RelacionCard Relacion="relacion" />
+                        }
+                    }
+                </div>
+            }
+            else
+            {
+                <EmptyState Message="No se encontraron relaciones familiares registradas." />
+            }
+        </div>
+    }
+    else
+    {
+        <EmptyState Message="No se pudo cargar la información del paciente." />
+    }
+</div>
+
+@code {
+    private PacienteEntity? unPaciente;
+
+    protected override async Task OnAuthenticatedInitializedAsync()
+    {
+        var pacienteId = PacienteId;
+        if (string.IsNullOrEmpty(pacienteId))
+            return;
+
+        _spinnerService.Show();
+        unPaciente = await _obtenerGrupoFamiliarUseCase.EjecutarAsync(pacienteId);
+        _spinnerService.Hide();
+    }
+}

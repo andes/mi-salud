@@ -1,0 +1,120 @@
+@using SaludPortal.Application.Models.Consentimiento
+@using SaludPortal.Web.Components.Icons
+@using SaludPortal.Web.Services
+@inject ConsentimientoContenidoRenderer Renderer
+@inject TelemetryService Telemetry
+
+<div class="pci-modal-overlay" @onclick="HandleOverlayClick">
+    <div class="pci-modal" role="dialog" aria-modal="true" aria-labelledby="pci-modal-titulo" @onclick:stopPropagation="true">
+        <div class="pci-modal-header">
+            @if (!esProgramaCuidar65)
+            {
+                <div class="pci-modal-header-icon" aria-hidden="true">
+                    <Icon Name="calendar2-heart" Size="28" Fill="#ffecc1" AriaLabel="Programa de cuidado integral" />
+                </div>
+            }
+
+            <div class="pci-modal-title-wrapper" style="display:flex;align-items:center;gap:0.5rem;">
+                @if (esProgramaCuidar65)
+                {
+                    <img src="/images/programa-cuidar-65.jpg" alt="Cuidar 65" class="pci-modal-program-logo" />
+                }
+                
+                <h2 id="pci-modal-titulo" class="pci-modal-title">@Titulo</h2>
+            </div>
+
+            @if (PermitirCerrarSinRespuesta)
+            {
+                <button type="button" class="pci-modal-close" @onclick="HandleCerrar" aria-label="Cerrar">
+                    <Icon Name="x-circle" Size="18" Fill="#ffecc1" AriaLabel="Cerrar" />
+                </button>
+            }
+        </div>
+
+        <div class="pci-modal-body">
+            <section class="pci-modal-section">
+                @if (!string.IsNullOrWhiteSpace(Texto))
+                {
+                    @if (FormatoContenido == FormatoContenidoConsentimiento.TextoPlano)
+                    {
+                        <div class="pci-modal-texto-contenido pci-modal-texto-plano">@Texto</div>
+                    }
+                    else
+                    {
+                        <div class="pci-modal-texto-contenido">
+                            @Renderer.Render(Texto, FormatoContenido)
+                        </div>
+                    }
+                }
+            </section>
+        </div>
+
+        <div class="pci-modal-footer">
+            @if (EstadoAceptacion != false)
+            {
+                <button type="button" class="btn btn-naranja" @onclick="() => HandleRespuesta(false)">
+                    Rechazar
+                </button>
+            }
+            @if (EstadoAceptacion != true)
+            {
+                <button type="button" class="btn btn-azul" @onclick="() => HandleRespuesta(true)">
+                    Aceptar
+                </button>
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public string Titulo { get; set; } = string.Empty;
+
+    [Parameter]
+    public string Programa { get; set; } = string.Empty;
+
+    [Parameter]
+    public string Texto { get; set; } = string.Empty;
+
+    [Parameter]
+    public FormatoContenidoConsentimiento FormatoContenido { get; set; } = FormatoContenidoConsentimiento.Html;
+
+    [Parameter]
+    public bool PermitirCerrarSinRespuesta { get; set; }
+
+    [Parameter]
+    public bool? EstadoAceptacion { get; set; }
+
+    [Parameter]
+    public EventCallback<bool> OnRespuesta { get; set; }
+
+    [Parameter]
+    public EventCallback OnCerrar { get; set; }
+
+    private bool esProgramaCuidar65 => string.Equals(Programa, "Cuidar65", StringComparison.OrdinalIgnoreCase);
+
+    private async Task HandleRespuesta(bool aceptado)
+    {
+        if (OnRespuesta.HasDelegate)
+        {
+            await OnRespuesta.InvokeAsync(aceptado);
+        }
+    }
+
+    private async Task HandleCerrar()
+    {
+        _ = Telemetry.TrackClickAsync("programas/cuidado-integral-cerrar");
+        if (OnCerrar.HasDelegate)
+        {
+            await OnCerrar.InvokeAsync();
+        }
+    }
+
+    private async Task HandleOverlayClick()
+    {
+        if (PermitirCerrarSinRespuesta)
+        {
+            await HandleCerrar();
+        }
+    }
+}

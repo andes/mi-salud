@@ -1,0 +1,142 @@
+@page "/turnosteleconsulta"
+@page "/turnostelesalud"
+@rendermode InteractiveServer
+
+@using Microsoft.AspNetCore.Components.Authorization
+@using SaludPortal.Web.Components.Modals
+@using SaludPortal.Web.Components.Shared
+@using SaludPortal.Web.Components.Icons
+@using SaludPortal.Web.Services
+@using SaludPortal.Application.Models.Turnos
+@using SaludPortal.Application.UseCases.Turnos
+
+@inject NavigationManager Nav
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject BlazorSpinner.SpinnerService _spinnerService
+@inject ObtenerTurnosDisponiblesUseCase _obtenerTurnosDisponiblesUseCase
+@inject ILogger<TurnosTeleconsulta> _logger
+
+@inherits AuthenticatedComponentBase
+
+<PageTitle>Telesalud - Mi Salud</PageTitle>
+
+<div class="teleconsulta-container">
+    <PageHeaderWithBack Title="Telesalud" 
+                        Subtitle="Solicite atención médica a distancia"
+                        BackHref="/misturnos"
+                        BackAriaLabel="Volver al Mis Turnos" />
+
+@if (!consentimientoAceptado)
+{
+    <ConsentimientoTelesalud OnAceptar="AceptarConsentimiento" OnRechazar="RechazarConsentimiento" />
+}
+
+@if (consentimientoAceptado)
+{
+    <div class="teleconsulta-content">
+        <div class="teleconsulta-alert">
+            <Icon Name="info-circle" Size="20" Fill="#0dcaf0" class="me-2" AriaLabel="Información" />
+            <p>
+                <strong>Importante:</strong> Solo puede tener un turno de telesalud asignado.
+            </p>
+        </div>
+
+        @if (listaTurnosPorTipoPrestacion.Count > 0)
+        {
+            <div class="teleconsulta-accordion" id="accAgendas">
+                @foreach (var tipoPrestacion in listaTurnosPorTipoPrestacion)
+                {
+                    var tipoId = $"TipoPrestacion_{tipoPrestacion.TipoPrestacionConceptId}";
+                    var collapseTipoId = $"collapse_{tipoPrestacion.TipoPrestacionConceptId}";
+                    <div class="teleconsulta-accordion-item">
+                        <h2 class="teleconsulta-accordion-header" id="@tipoId">
+                            <button class="teleconsulta-accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#@collapseTipoId" aria-expanded="true" aria-controls="@collapseTipoId">
+                                <Icon Name="calendar-check" Size="20" Fill="#87b867" class="me-2" AriaLabel="Prestación" />
+                                @tipoPrestacion.TipoPrestacionTerm
+                            </button>
+                        </h2>
+                        <div id="@collapseTipoId" class="teleconsulta-accordion-collapse collapse show" aria-labelledby="@tipoId" data-bs-parent="#accAgendas">
+                            <div class="teleconsulta-accordion-body">
+                                <div class="teleconsulta-efectores-list">
+                                    @foreach (var efector in tipoPrestacion.Efectores)
+                                    {
+                                        var primerTurno = efector.TurnosDisponibles.FirstOrDefault();
+                                        <EfectorTelesaludCard
+                                            EfectorNombre="@efector.Nombre"
+                                            TieneTurnoDisponible="@(primerTurno != null)"
+                                            OnSolicitar="@(primerTurno != null ? EventCallback.Factory.Create(this, async () => await ShowModalConfirmar(primerTurno)) : default(EventCallback))" />
+                                    }
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+        else
+        {
+            <EmptyState Message="No hay turnos de telesalud disponibles." />
+        }
+    </div>
+}
+</div>
+
+@code {
+    private bool consentimientoAceptado = false;
+    private List<TurnosPorTipoPrestacion> listaTurnosPorTipoPrestacion = [];
+
+    [CascadingParameter] IModalService Modal { get; set; } = default!;
+
+    private async Task AceptarConsentimiento()
+    {
+        consentimientoAceptado = true;
+        await ObtenerTurnosTeleconsulta();
+        StateHasChanged();
+    }
+
+    private void RechazarConsentimiento()
+    {
+        Nav.NavigateTo("/misturnos", forceLoad: true);
+    }
+
+    private async Task ShowModalConfirmar(TurnoDisponible turno)
+    {
+        var options = new ModalOptions()
+        {
+            Size = ModalSize.Large,
+            Position = ModalPosition.TopCenter,
+            HideCloseButton = true,
+            HideHeader = true
+        };
+
+        string paciente = (User.GetNombre() ?? "") + " " + (User.GetApellido() ?? "");
+
+        var parameters = new ModalParameters()
+            .Add(nameof(RegistrarTurnoTeleconsultaConfirmar.Paciente), paciente)
+            .Add(nameof(RegistrarTurnoTeleconsultaConfirmar.turnoDisponible), turno);
+
+        Modal.Show<RegistrarTurnoTeleconsultaConfirmar>(parameters, options);
+    }
+
+    private async Task ObtenerTurnosTeleconsulta()
+    {
+        var pacienteId = PacienteId;
+        if (string.IsNullOrEmpty(pacienteId))
+            return;
+
+        _spinnerService.Show();
+
+        try
+        {
+            listaTurnosPorTipoPrestacion = await _obtenerTurnosDisponiblesUseCase.EjecutarAsync(pacienteId, esTeleconsulta: true);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error al cargar las agendas de organizaciones para telesalud");
+        }
+        finally
+        {
+            _spinnerService.Hide();
+        }
+    }
+}

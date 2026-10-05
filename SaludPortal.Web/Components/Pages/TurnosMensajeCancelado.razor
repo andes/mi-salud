@@ -1,0 +1,31 @@
+﻿@page "/turnosmensajecancelado"
+@rendermode InteractiveServer
+
+@using AndesServices.Entities
+@using SaludPortal.Web.Components.Shared
+@using SaludPortal.Web.Components.Icons
+@inject MessageService MessageService
+
+<PageTitle>Turno cancelado - Mi Salud</PageTitle>
+
+<div class="turnos-mensaje-container">
+    <PageHeaderWithBack Title="Mis turnos"
+                        BackHref="/misturnos"
+                        BackText="Volver a mis turnos"
+                        BackAriaLabel="Volver a mis turnos" />
+
+    <div class="turnos-mensaje-card turnos-mensaje-warning">
+        <div class="turnos-mensaje-icon-wrapper">
+            <Icon Name="check-circle" Size="64" Fill="#dc3545" AriaLabel="Cancelado" />
+        </div>
+        <div class="turnos-mensaje-content">
+            <h2 class="turnos-mensaje-title">@MessageService.Title</h2>
+            @if (!string.IsNullOrWhiteSpace(MessageService.Content))
+            {
+                <div class="turnos-mensaje-body">
+                    <p>@MessageService.Content</p>
+                </div>
+            }
+        </div>
+    </div>
+</div>

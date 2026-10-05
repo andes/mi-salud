@@ -1,0 +1,24 @@
+﻿using AndesServices.DTOs.Login;
+using AndesServices.Entities;
+
+namespace AndesServices.Interfaces
+{
+    public interface ILoginService<T>
+    {
+        Task<User?> Login(string email, string password);
+        Task<User> Login(string email, string password, Ref<string> mensaje);
+        Task<bool> Logout(string token);
+        Task<bool> UpdateUser(T user);
+        Task<bool> DeleteUser(string id);
+        Task<T> GetUserById(string id);
+        Task<List<T>> GetAllUsers();
+
+        Task<OlvideContraseniaResponseDto?> OlvideContrasenia(OlvideContraseniaRequestDto request);
+        Task<bool> RestablecerPassword(string email);
+        Task<ReestablecerPasswordResponseDto?> ReestablecerPassword(ReestablecerPasswordRequestDto request);
+        Task<(RegistroResponseDto? response, string? errorMessage)> Registro(RegistroRequestDto dto);
+        Task<ValidarCodigoActivacionResponseDto?> ValidarCodigoActivacion(ValidarCodigoActivacionRequestDto dto);
+        Task<(CrearContraseniaResponseDto? response, string? errorMessage)> CrearContrasenia(CrearContraseniaRequestDto dto);
+
+    }
+}

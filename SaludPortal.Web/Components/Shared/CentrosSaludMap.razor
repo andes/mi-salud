@@ -1,0 +1,162 @@
+@using Microsoft.AspNetCore.Components
+@using SaludPortal.Application.Models.CentrosDeSalud
+@inject IJSRuntime JS
+@inject ILogger<CentrosSaludMap> _logger
+
+<div class="centros-mapa-container">
+	<div id="@_mapElementId" class="map-canvas"></div>
+</div>
+
+@code {
+	private readonly string _mapElementId = $"centros-map-{Guid.NewGuid():N}";
+	private bool _isMapInitialized;
+	private string _lastDataSignature = string.Empty;
+	private string _lastPatientSignature = string.Empty;
+
+	[Parameter]
+	public List<CentroSaludModel> Centros { get; set; } = new();
+
+	[Parameter]
+	public CentroSaludModel? CentroSeleccionado { get; set; }
+
+	[Parameter]
+	public double? PacienteLatitud { get; set; }
+
+	[Parameter]
+	public double? PacienteLongitud { get; set; }
+
+	[Parameter]
+	public string? PacienteDireccion { get; set; }
+
+	protected override async Task OnAfterRenderAsync(bool firstRender)
+	{
+		if (firstRender)
+		{
+			await EnsureMapInitializedAsync();
+		}
+
+		if (!_isMapInitialized)
+		{
+			return;
+		}
+
+		await SyncMarkersAsync();
+		await SyncSelectionAsync();
+		await SyncPatientAddressAsync();
+	}
+
+	protected override async Task OnParametersSetAsync()
+	{
+		if (_isMapInitialized)
+		{
+			await SyncMarkersAsync();
+			await SyncPatientAddressAsync();
+		}
+	}
+
+	private async Task EnsureMapInitializedAsync()
+	{
+		var center = GetMapCenter();
+
+		try
+		{
+			await JS.InvokeVoidAsync(
+				"centrosSaludMap.init",
+				_mapElementId,
+				center.lat,
+				center.lng,
+				Centros);
+
+			_isMapInitialized = true;
+			_lastDataSignature = BuildDataSignature();
+		}
+		catch (Exception ex)
+		{
+			_logger.LogError(ex, "Error inicializando el mapa de centros de salud");
+		}
+	}
+
+	private async Task SyncMarkersAsync()
+	{
+		var signature = BuildDataSignature();
+		if (signature == _lastDataSignature)
+		{
+			return;
+		}
+
+		try
+		{
+			await JS.InvokeVoidAsync("centrosSaludMap.setMarkers", _mapElementId, Centros);
+			_lastDataSignature = signature;
+		}
+		catch (Exception ex)
+		{
+			_logger.LogError(ex, "Error actualizando markers en el mapa de centros de salud");
+		}
+	}
+
+	private async Task SyncSelectionAsync()
+	{
+		var selectedId = CentroSeleccionado?.Id;
+		if (string.IsNullOrWhiteSpace(selectedId))
+		{
+			return;
+		}
+
+		try
+		{
+			await JS.InvokeVoidAsync("centrosSaludMap.focus", _mapElementId, selectedId);
+		}
+		catch (Exception ex)
+		{
+			_logger.LogError(ex, "Error enfocando centro en mapa");
+		}
+	}
+
+	private (double lat, double lng) GetMapCenter()
+	{
+		var withCoords = Centros.FirstOrDefault(c => c.Latitud.HasValue && c.Longitud.HasValue);
+		if (withCoords != null)
+		{
+			return (withCoords.Latitud!.Value, withCoords.Longitud!.Value);
+		}
+
+		return (-38.9516, -68.0591);
+	}
+
+	private async Task SyncPatientAddressAsync()
+	{
+		if (!PacienteLatitud.HasValue || !PacienteLongitud.HasValue)
+		{
+			return;
+		}
+
+		var signature = $"{PacienteLatitud}|{PacienteLongitud}|{PacienteDireccion}";
+		if (signature == _lastPatientSignature)
+		{
+			return;
+		}
+
+		try
+		{
+			await JS.InvokeVoidAsync(
+				"centrosSaludMap.showPatientAddress",
+				_mapElementId,
+				PacienteLatitud.Value,
+				PacienteLongitud.Value,
+				PacienteDireccion);
+			_lastPatientSignature = signature;
+		}
+		catch (Exception ex)
+		{
+			_logger.LogError(ex, "Error mostrando dirección del paciente en mapa");
+		}
+	}
+
+	private string BuildDataSignature()
+	{
+		var ids = Centros.Select(c => c.Id);
+		return string.Join("|", ids);
+	}
+
+}

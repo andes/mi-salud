@@ -1,0 +1,577 @@
+﻿@using System.Text.RegularExpressions
+@using AndesServices.Entities
+@using Microsoft.AspNetCore.Components.Authorization
+@using SaludPortal.Application.Models.Turnos
+@using SaludPortal.Application.UseCases.Turnos
+@using SaludPortal.Web.Components.Shared
+
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject BlazorSpinner.SpinnerService _spinnerService
+@inject MessageService MessageService
+@inject SolicitarTeleconsultaUseCase SolicitarTeleconsultaUseCase
+@inject ILogger<RegistrarTurnoTeleconsultaConfirmar> _logger
+@inject TelemetryService Telemetry
+
+@inherits AuthenticatedComponentBase
+
+<div>
+    <h2>CONFIRMAR TELESALUD</h2>
+    <h3>
+        <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" fill="currentColor" class="bi bi-calendar" viewBox="0 0 16 16">
+            <path d="M3.5 0a.5.5 0 0 1 .5.5V1h8V.5a.5.5 0 0 1 1 0V1h1a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V3a2 2 0 0 1 2-2h1V.5a.5.5 0 0 1 .5-.5M1 4v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V4z" />
+        </svg> Detalles del turno
+    </h3>
+</div>
+<div class="d-inline-flex flex-lg-row" style="background:#edfce2;color:#000;width:100%;">
+    <div class="p-sm-2 flex-shrink-1"></div>
+    <div class="p-lg-10 flex-fill flex-grow-1" style="padding:5px; width:100%; margin:5px;">
+        <p>
+            <div><label><strong>Prestación</strong></label></div>
+            <div><label>@turnoDisponible.TipoPrestacionDetalle</label></div>
+        </p>
+        <hr />
+        <p>
+            <div><label><strong>Paciente</strong></label></div>
+            <div><label>@Paciente</label></div>
+        </p>
+        <hr />
+        <p>
+            <div><label><strong>@turnoDisponible.NombreEfector</strong></label></div>
+            <div><label>@turnoDisponible.DomicilioEfector</label></div>
+        </p>
+        <hr />
+        <p>
+            <div><label><strong>Teléfono celular de contacto *</strong></label></div>
+            <div class="mt-2 d-flex gap-2 align-items-start">
+                <div style="flex: 0 0 150px;">
+                    <input type="tel"
+                           inputmode="numeric"
+                           class="form-control @(errorCodigoArea ? "is-invalid" : "")"
+                           placeholder="Cod. área (sin 0)"
+                           @bind="CodigoAreaValue"
+                           @bind:event="oninput"
+                           onkeydown="numericInput.preventNonNumeric(event)"
+                           maxlength="@maxLengthCodigoArea" />
+                    @if (errorCodigoArea)
+                    {
+                        <small class="text-danger">Sin 0 inicial</small>
+                    }
+                </div>
+                <div style="flex: 1;">
+                    <input type="tel"
+                           class="form-control @(errorTelefono ? "is-invalid" : "" )"
+                           placeholder="Número (sin 15)"
+                           @bind="TelefonoValue"
+                           @bind:event="oninput"
+                           onkeydown="numericInput.preventNonNumeric(event)"
+                           maxlength="@maxLengthTelefono" />
+                    @if (errorTelefono)
+                    {
+                    <small class="text-danger">Sin 15 al inicio</small>
+                    }
+                </div>
+            </div>
+            <small class="text-muted">Ingrese código de área (ej: 299) y número sin 15 (ej: 4123456). Total: @(codigoArea.Length + telefono.Length)/10 caracteres</small>
+        </p>
+        <hr />
+        <p>
+            <div><label><strong>Confirmar teléfono celular de contacto *</strong></label></div>
+            <div class="mt-2 d-flex gap-2 align-items-start">
+                <div style="flex: 0 0 150px;">
+                    <input type="tel"
+                           class="form-control @(errorConfirmarCodigoArea || errorCoincidenciaCodigoArea ? "is-invalid" : (confirmarCodigoArea.Length > 0 && !errorCoincidenciaCodigoArea ? "is-valid" : ""))"
+                           placeholder="Cod. área (sin 0)"
+                           @bind="ConfirmarCodigoAreaValue"
+                           @bind:event="oninput"
+                           onkeydown="numericInput.preventNonNumeric(event)"
+                           maxlength="@maxLengthCodigoArea" />
+                    @if (errorConfirmarCodigoArea)
+                    {
+                        <small class="text-danger">Sin 0 inicial</small>
+                    }
+                    else if (errorCoincidenciaCodigoArea)
+                    {
+                        <small class="text-danger">No coincide</small>
+                    }
+                </div>
+                <div style="flex: 1;">
+                    <input type="tel"
+                           class="form-control @(errorConfirmarTelefono || errorCoincidenciaTelefono ? "is-invalid" : (confirmarTelefono.Length > 0 && !errorCoincidenciaTelefono ? "is-valid" : ""))"
+                           placeholder="Número (sin 15)"
+                           @bind="ConfirmarTelefonoValue"
+                           @bind:event="oninput"
+                           onkeydown="numericInput.preventNonNumeric(event)"
+                           maxlength="@maxLengthTelefono" />
+                    @if (errorConfirmarTelefono)
+                    {
+                        <small class="text-danger">Sin 15 al inicio</small>
+                    }
+                    else if (errorCoincidenciaTelefono)
+                    {
+                        <small class="text-danger">No coincide</small>
+                    }
+                </div>
+            </div>
+            <small class="text-muted">Vuelva a ingresar el código de área y número para confirmar</small>
+        </p>
+        <hr />
+        <p>
+            <div><label><strong>Motivo de la consulta *</strong></label></div>
+            <div class="mt-2">
+                <select class="form-select" @bind="motivoSeleccionado" @bind:after="OnMotivoChanged">
+                    <option value="">-- Seleccione un motivo --</option>
+                    <option value="Receta">Receta</option>
+                    @* <option value="Certificado">Certificado</option> *@
+                    <option value="Otros">Otros</option>
+                </select>
+            </div>
+        </p>
+        @if (motivoSeleccionado == "Otros")
+        {
+            <p class="mt-3">
+                <div><label><strong>Especifique el motivo *</strong></label></div>
+                <div class="mt-2">
+                    <textarea class="form-control" rows="3" @bind="motivoOtros" placeholder="Ingrese el motivo de la consulta" maxlength="50"></textarea>
+                    <small class="text-muted">Máximo 50 caracteres</small>
+                </div>
+            </p>
+        }
+        <hr />
+    </div>
+</div>
+<br />
+@if (!string.IsNullOrEmpty(mensajeError))
+{
+    <div class="alert alert-danger" role="alert">
+        @mensajeError
+    </div>
+}
+<br />
+<div style="display: flex; justify-content: space-between; width: 100%;">
+    <button @onclick="Close" class="btn btn-outline-primary" title="Cerrar">Cerrar</button>
+    <button @onclick="() => ConfirmarTurno()" class="btn btn-primary" title="Confirmar" disabled="@(!ValidarFormulario())">Confirmar</button>
+</div>
+
+@code {
+
+    [CascadingParameter] BlazoredModalInstance ModalConfirmarTurno { get; set; } = default!;
+
+    [Parameter] public string Paciente { get; set; }
+    [Parameter] public TurnoDisponible turnoDisponible { get; set; }
+
+    private const int LONGITUD_MAXIMA_TOTAL = 10;
+    private const int LONGITUD_MINIMA_CODIGO_AREA = 2;
+    private const int LONGITUD_MAXIMA_CODIGO_AREA = 4;
+    private const int LONGITUD_MINIMA_TELEFONO = 6;
+    private const int LONGITUD_MAXIMA_TELEFONO = 8;
+
+    private string motivoSeleccionado = "";
+    private string motivoOtros = "";
+    private string codigoArea = "";
+    private string telefono = "";
+    private string confirmarCodigoArea = "";
+    private string confirmarTelefono = "";
+    private string mensajeError = "";
+    private bool errorCodigoArea = false;
+    private bool errorTelefono = false;
+    private bool errorConfirmarCodigoArea = false;
+    private bool errorConfirmarTelefono = false;
+    private bool errorCoincidenciaCodigoArea = false;
+    private bool errorCoincidenciaTelefono = false;
+    private int maxLengthCodigoArea = 4;
+    private int maxLengthTelefono = 10;
+
+    // Expresiones regulares para validación
+    private static readonly Regex SoloNumerosRegex = new Regex(@"[^\d]", RegexOptions.Compiled);
+    private static readonly Regex IniciaConCeroRegex = new Regex(@"^0+", RegexOptions.Compiled);
+    private static readonly Regex IniciaConQuinceRegex = new Regex(@"^15", RegexOptions.Compiled);
+
+    // Propiedades con setters personalizados para binding bidireccional
+    private string CodigoAreaValue
+    {
+        get => codigoArea;
+        set
+        {
+            string valor = value ?? "";
+
+            // Eliminar cualquier carácter que no sea número
+            valor = SoloNumerosRegex.Replace(valor, "");
+
+            // Verificar y eliminar el 0 inicial
+            bool teniaCodigoInicial = IniciaConCeroRegex.IsMatch(valor);
+            if (teniaCodigoInicial)
+            {
+                valor = IniciaConCeroRegex.Replace(valor, "");
+            }
+
+            // Limitar a máximo permitido para código de área
+            int maxPermitidoCodigoArea = Math.Min(
+                LONGITUD_MAXIMA_CODIGO_AREA,
+                LONGITUD_MAXIMA_TOTAL - telefono.Length
+            );
+
+            if (maxPermitidoCodigoArea < LONGITUD_MINIMA_CODIGO_AREA)
+                maxPermitidoCodigoArea = LONGITUD_MINIMA_CODIGO_AREA;
+
+            if (valor.Length > maxPermitidoCodigoArea)
+            {
+                valor = valor.Substring(0, maxPermitidoCodigoArea);
+            }
+
+            codigoArea = valor;
+
+            // Solo marcar error si después de limpiar, el valor del campo actual inicia con 0
+            // (esto normalmente no debería pasar, pero es por seguridad)
+            errorCodigoArea = codigoArea.StartsWith("0");
+
+            // Actualizar el máximo permitido para el teléfono
+            maxLengthTelefono = Math.Min(
+                LONGITUD_MAXIMA_TELEFONO,
+                LONGITUD_MAXIMA_TOTAL - codigoArea.Length
+            );
+
+            if (telefono.Length > maxLengthTelefono)
+            {
+                telefono = telefono.Substring(0, maxLengthTelefono);
+            }
+
+            ValidarCoincidenciaCodigoArea();
+            mensajeError = "";
+        }
+    }
+
+    private string TelefonoValue
+    {
+        get => telefono;
+        set
+        {
+            string valor = value ?? "";
+
+            // Eliminar cualquier carácter que no sea número
+            valor = SoloNumerosRegex.Replace(valor, "");
+
+            // Verificar y eliminar el prefijo 15
+            bool teniaPrefijo15 = IniciaConQuinceRegex.IsMatch(valor);
+            if (teniaPrefijo15)
+            {
+                valor = IniciaConQuinceRegex.Replace(valor, "");
+            }
+
+            // Limitar a máximo permitido para teléfono
+            int maxPermitidoTelefono = Math.Min(
+                LONGITUD_MAXIMA_TELEFONO,
+                LONGITUD_MAXIMA_TOTAL - codigoArea.Length
+            );
+
+            if (valor.Length > maxPermitidoTelefono)
+            {
+                valor = valor.Substring(0, maxPermitidoTelefono);
+            }
+
+            telefono = valor;
+
+            // Solo marcar error si después de limpiar, el valor del campo actual inicia con 15
+            errorTelefono = telefono.StartsWith("15");
+
+            // Actualizar el máximo permitido para el código de área
+            maxLengthCodigoArea = Math.Min(
+                LONGITUD_MAXIMA_CODIGO_AREA,
+                LONGITUD_MAXIMA_TOTAL - telefono.Length
+            );
+
+            if (maxLengthCodigoArea < LONGITUD_MINIMA_CODIGO_AREA)
+                maxLengthCodigoArea = LONGITUD_MINIMA_CODIGO_AREA;
+
+            if (codigoArea.Length > maxLengthCodigoArea)
+            {
+                codigoArea = codigoArea.Substring(0, maxLengthCodigoArea);
+            }
+
+            ValidarCoincidenciaTelefono();
+            mensajeError = "";
+        }
+    }
+
+    private string ConfirmarCodigoAreaValue
+    {
+        get => confirmarCodigoArea;
+        set
+        {
+            string valor = value ?? "";
+
+            // Eliminar cualquier carácter que no sea número
+            valor = SoloNumerosRegex.Replace(valor, "");
+
+            // Verificar y eliminar el 0 inicial
+            bool teniaCodigoInicial = IniciaConCeroRegex.IsMatch(valor);
+            if (teniaCodigoInicial)
+            {
+                valor = IniciaConCeroRegex.Replace(valor, "");
+            }
+
+            // Limitar a máximo permitido
+            int maxPermitidoCodigoArea = Math.Min(
+                LONGITUD_MAXIMA_CODIGO_AREA,
+                LONGITUD_MAXIMA_TOTAL - confirmarTelefono.Length
+            );
+
+            if (maxPermitidoCodigoArea < LONGITUD_MINIMA_CODIGO_AREA)
+                maxPermitidoCodigoArea = LONGITUD_MINIMA_CODIGO_AREA;
+
+            if (valor.Length > maxPermitidoCodigoArea)
+            {
+                valor = valor.Substring(0, maxPermitidoCodigoArea);
+            }
+
+            confirmarCodigoArea = valor;
+
+            // Solo marcar error si el valor actual inicia con 0
+            errorConfirmarCodigoArea = confirmarCodigoArea.StartsWith("0");
+
+            ValidarCoincidenciaCodigoArea();
+            mensajeError = "";
+        }
+    }
+
+    private string ConfirmarTelefonoValue
+    {
+        get => confirmarTelefono;
+        set
+        {
+            string valor = value ?? "";
+
+            // Eliminar cualquier carácter que no sea número
+            valor = SoloNumerosRegex.Replace(valor, "");
+
+            // Verificar y eliminar el prefijo 15
+            bool teniaPrefijo15 = IniciaConQuinceRegex.IsMatch(valor);
+            if (teniaPrefijo15)
+            {
+                valor = IniciaConQuinceRegex.Replace(valor, "");
+            }
+
+            // Limitar a máximo permitido
+            int maxPermitidoTelefono = Math.Min(
+                LONGITUD_MAXIMA_TELEFONO,
+                LONGITUD_MAXIMA_TOTAL - confirmarCodigoArea.Length
+            );
+
+            if (valor.Length > maxPermitidoTelefono)
+            {
+                valor = valor.Substring(0, maxPermitidoTelefono);
+            }
+
+            confirmarTelefono = valor;
+
+            // Solo marcar error si el valor actual inicia con 15
+            errorConfirmarTelefono = confirmarTelefono.StartsWith("15");
+
+            ValidarCoincidenciaTelefono();
+            mensajeError = "";
+        }
+    }
+
+    private void ValidarCoincidenciaCodigoArea()
+    {
+        if (!string.IsNullOrEmpty(confirmarCodigoArea))
+        {
+            errorCoincidenciaCodigoArea = codigoArea != confirmarCodigoArea;
+        }
+        else
+        {
+            errorCoincidenciaCodigoArea = false;
+        }
+    }
+
+    private void ValidarCoincidenciaTelefono()
+    {
+        if (!string.IsNullOrEmpty(confirmarTelefono))
+        {
+            errorCoincidenciaTelefono = telefono != confirmarTelefono;
+        }
+        else
+        {
+            errorCoincidenciaTelefono = false;
+        }
+    }
+
+    private void OnMotivoChanged()
+    {
+        mensajeError = "";
+        if (motivoSeleccionado != "Otros")
+        {
+            motivoOtros = "";
+        }
+    }
+
+    private bool ValidarFormulario()
+    {
+        // Validar código de área (entre 2 y 4 dígitos)
+        if (string.IsNullOrWhiteSpace(codigoArea) ||
+            codigoArea.Length < LONGITUD_MINIMA_CODIGO_AREA ||
+            codigoArea.Length > LONGITUD_MAXIMA_CODIGO_AREA)
+        {
+            return false;
+        }
+
+        // Validar teléfono (entre 6 y 8 dígitos)
+        if (string.IsNullOrWhiteSpace(telefono) ||
+            telefono.Length < LONGITUD_MINIMA_TELEFONO ||
+            telefono.Length > LONGITUD_MAXIMA_TELEFONO)
+        {
+            return false;
+        }
+
+        // Validar confirmación de código de área
+        if (string.IsNullOrWhiteSpace(confirmarCodigoArea) ||
+            confirmarCodigoArea.Length < LONGITUD_MINIMA_CODIGO_AREA ||
+            confirmarCodigoArea.Length > LONGITUD_MAXIMA_CODIGO_AREA)
+        {
+            return false;
+        }
+
+        // Validar confirmación de teléfono
+        if (string.IsNullOrWhiteSpace(confirmarTelefono) ||
+            confirmarTelefono.Length < LONGITUD_MINIMA_TELEFONO ||
+            confirmarTelefono.Length > LONGITUD_MAXIMA_TELEFONO)
+        {
+            return false;
+        }
+
+        // Validar coincidencia
+        if (codigoArea != confirmarCodigoArea || telefono != confirmarTelefono)
+        {
+            return false;
+        }
+
+        // Validar longitud total
+        if ((codigoArea.Length + telefono.Length) > LONGITUD_MAXIMA_TOTAL)
+        {
+            return false;
+        }
+
+        // Validar que no haya errores
+        if (errorCodigoArea || errorTelefono || errorConfirmarCodigoArea ||
+            errorConfirmarTelefono || errorCoincidenciaCodigoArea || errorCoincidenciaTelefono)
+        {
+            return false;
+        }
+
+        // Validar motivo
+        if (string.IsNullOrEmpty(motivoSeleccionado))
+        {
+            return false;
+        }
+
+        if (motivoSeleccionado == "Otros" && string.IsNullOrWhiteSpace(motivoOtros))
+        {
+            return false;
+        }
+
+        return true;
+    }
+
+    private string ObtenerMotivoCompleto()
+    {
+        if (motivoSeleccionado == "Otros")
+        {
+            return motivoOtros.Trim();
+        }
+        return motivoSeleccionado;
+    }
+
+    private string ObtenerTelefonoCompleto()
+    {
+        return $"{codigoArea}{telefono}";
+    }
+
+    private async Task Close()
+    {
+        _ = Telemetry.TrackClickAsync("telesalud/confirmar-cerrar-modal");
+        await ModalConfirmarTurno.CloseAsync();
+    }
+
+    private async Task ConfirmarTurno()
+    {
+        // Validar antes de confirmar
+        if (!ValidarFormulario())
+        {
+            if (string.IsNullOrWhiteSpace(codigoArea) || string.IsNullOrWhiteSpace(telefono))
+            {
+                mensajeError = "Debe ingresar un teléfono celular válido.";
+            }
+            else if (string.IsNullOrWhiteSpace(confirmarCodigoArea) || string.IsNullOrWhiteSpace(confirmarTelefono))
+            {
+                mensajeError = "Debe confirmar el teléfono celular.";
+            }
+            else if (codigoArea != confirmarCodigoArea || telefono != confirmarTelefono)
+            {
+                mensajeError = "Los números de teléfono no coinciden. Por favor, verifique.";
+            }
+            else if ((codigoArea.Length + telefono.Length) > LONGITUD_MAXIMA_TOTAL)
+            {
+                mensajeError = $"El teléfono completo no debe superar los {LONGITUD_MAXIMA_TOTAL} dígitos.";
+            }
+            else if (motivoSeleccionado == "Otros" && string.IsNullOrWhiteSpace(motivoOtros))
+            {
+                mensajeError = "Debe especificar el motivo de la consulta.";
+            }
+            else if (string.IsNullOrEmpty(motivoSeleccionado))
+            {
+                mensajeError = "Debe seleccionar un motivo de consulta.";
+            }
+            else
+            {
+                mensajeError = "Por favor, complete todos los campos requeridos correctamente.";
+            }
+            return;
+        }
+
+        var token = BackendToken;
+        if (string.IsNullOrEmpty(token))
+            return;
+
+        var pacienteId = PacienteId;
+        if (string.IsNullOrEmpty(pacienteId))
+            return;
+
+        _ = Telemetry.TrackClickAsync("telesalud/confirmar", metadata: new { turnoId = turnoDisponible.Id, efector = turnoDisponible.NombreEfector });
+
+        _spinnerService.Show();
+
+        try
+        {
+            string motivoCompleto = ObtenerMotivoCompleto();
+            string telefonoCompleto = ObtenerTelefonoCompleto();
+
+            bool resultado = await SolicitarTeleconsultaUseCase.EjecutarAsync(
+                    pacienteId,
+                    turnoDisponible,
+                    motivoCompleto,
+                    telefonoCompleto);
+
+            _spinnerService.Hide();
+
+            if (resultado)
+            {
+                await ModalConfirmarTurno.CloseAsync();
+                MessageService.Title = "Turno confirmado";
+                MessageService.Content = $"El turno de tele salud ha sido confirmado exitosamente.<br/><br/><strong>Teléfono de contacto:</strong> {telefonoCompleto}.<br/><strong>Motivo:</strong> {motivoCompleto}.";
+                Nav.NavigateTo("/turnosmensajeconfirma");
+            }
+            else
+            {
+                await ModalConfirmarTurno.CloseAsync();
+                MessageService.Title = "Turno no confirmado";
+                MessageService.Content = "No se pudo confirmar el turno. Posiblemente el turno ya no se encontraba disponible. Por favor, intente nuevamente.";
+                Nav.NavigateTo("/turnosmensajenoconfirma");
+            }            
+        }
+        catch (Exception ex)
+        {
+            _spinnerService.Hide();
+            mensajeError = "Ocurrió un error al confirmar el turno. Por favor, intente nuevamente.";
+            _logger.LogError(ex, "Error al confirmar turno");
+        }
+    }
+}

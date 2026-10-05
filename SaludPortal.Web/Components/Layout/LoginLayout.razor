@@ -1,0 +1,24 @@
+﻿@inherits LayoutComponentBase
+@using SaludPortal.Web.Components.Shared
+
+<PageTitle>Mi Salud</PageTitle>
+
+<div class="page">
+    <main>
+        <div class="top-row px-4">
+            <div class="top-row__title">
+                Mi Salud - Neuquén
+            </div>
+            <div class="logo-container">
+                <img src="../images/neuquen-logo.svg" alt="">
+                <img src="../images/gobierno-neuquen.svg" alt="">
+            </div>
+        </div>
+
+        <div class="content">
+            @Body
+        </div>
+    </main>
+</div>
+
+<AppToastHost />

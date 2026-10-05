@@ -1,0 +1,186 @@
+.receta-card {
+    background-color: #fff;
+    border: 2px solid #e0e0e0;
+    border-radius: 12px;
+    padding: 1.5rem;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+.receta-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 4px;
+    height: 100%;
+    background: linear-gradient(180deg, #00374c 0%, #87b867 100%);
+    transition: width 0.3s ease;
+}
+
+.receta-card:hover {
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.12);
+    border-color: #00374c;
+}
+
+.receta-card:hover::before {
+    width: 6px;
+}
+
+.receta-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 2px solid #f0f0f0;
+    flex-wrap: wrap;
+    gap: 0.2rem;
+}
+
+.receta-fecha {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: #00374c;
+}
+
+.receta-badges {
+    display: flex;
+    align-items: center;
+    gap: 0.2rem;
+    flex-wrap: wrap;
+}
+
+.receta-origen {
+    display: inline-block;
+    padding: 0.2rem 0.4rem;
+    border-radius: 15px;
+    font-weight: 600;
+    font-size: 0.75rem;
+    border: 1px solid currentColor;
+}
+
+.receta-origen--andes {
+    color: #00374c;
+    background-color: #e8f1f4;
+}
+
+.receta-origen--recetar {
+    color: #128647;
+    background-color: #eaf5ee;
+}
+
+.receta-estado {
+    display: inline-block;
+    color: #fff;
+    padding: 0.25rem 0.75rem;
+    border-radius: 15px;
+    font-weight: 600;
+    font-size: 0.85rem;
+    text-transform: capitalize;
+}
+
+.receta-estado--sin-dispensa {
+    background: linear-gradient(135deg, #9b7ec7 0%, #7e57c2 100%);
+    box-shadow: 0 2px 4px rgba(126, 87, 194, 0.25);
+}
+
+.receta-estado--dispensada {
+    background: linear-gradient(135deg, #87b867 0%, #128647 100%);
+    box-shadow: 0 2px 4px rgba(135, 184, 103, 0.25);
+}
+
+.receta-estado--vencida {
+    background: linear-gradient(135deg, #ff9a5a 0%, #e65100 100%);
+    box-shadow: 0 2px 4px rgba(230, 81, 0, 0.25);
+}
+
+.receta-body {
+    padding-top: 0.5rem;
+}
+
+.receta-section {
+    margin-bottom: 1.5rem;
+}
+
+.receta-section:last-child {
+    margin-bottom: 0;
+}
+
+.receta-section-title {
+    font-size: 1rem;
+    font-weight: 600;
+    color: #00374c;
+    margin-bottom: 0.75rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.receta-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+}
+
+.receta-info:last-child {
+    margin-bottom: 0;
+}
+
+.receta-label {
+    font-size: 0.875rem;
+    color: #666;
+    font-weight: 500;
+}
+
+.receta-value {
+    font-size: 1rem;
+    color: #00374c;
+    font-weight: 600;
+}
+
+.receta-medicamento-table {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    background-color: #f8f9fa;
+    padding: 1rem;
+    border-radius: 8px;
+    border: 1px solid #e0e0e0;
+}
+
+.receta-medicamento-row {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.receta-medicamento-label {
+    font-size: 0.875rem;
+    color: #666;
+    font-weight: 500;
+}
+
+.receta-medicamento-value {
+    font-size: 1rem;
+    color: #00374c;
+    font-weight: 600;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .receta-card {
+        padding: 1.25rem;
+    }
+
+    .receta-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .receta-medicamento-row {
+        flex-direction: column;
+    }
+}

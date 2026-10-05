@@ -1,0 +1,140 @@
+﻿@page "/turnosnuevo"
+@rendermode InteractiveServer
+
+@using Microsoft.AspNetCore.Components.Authorization
+@using SaludPortal.Application.Models.Turnos
+@using SaludPortal.Application.UseCases.Turnos
+@using SaludPortal.Web.Components.Modals
+@using SaludPortal.Web.Components.Shared
+@using SaludPortal.Web.Components.Icons
+@using SaludPortal.Web.Services
+@using System.Linq
+
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject BlazorSpinner.SpinnerService _spinnerService
+@inject ObtenerTurnosDisponiblesUseCase _obtenerTurnosDisponiblesUseCase
+@inject ILogger<TurnosNuevo> _logger
+@inject TelemetryService Telemetry
+
+@inherits AuthenticatedComponentBase
+
+<PageTitle>Nuevo turno - Mi Salud</PageTitle>
+
+<div class="turnos-nuevo-container">
+    <PageHeaderWithBack Title="Nuevo turno"
+                        Subtitle="Agendas disponibles"
+                        BackHref="/misturnos"
+                        BackAriaLabel="Volver al Mis Turnos" />
+
+    @if (listaTurnosPorTipoPrestacion != null && listaTurnosPorTipoPrestacion.Count > 0)
+    {
+        var hayMasDeUnTipo = listaTurnosPorTipoPrestacion.Count > 1;
+        <div class="turnos-nuevo-accordion" id="accAgendas">
+
+            @foreach (var tipoPrestaciones in listaTurnosPorTipoPrestacion)
+            {
+                var tipoId = $"TipoPrestacion_{tipoPrestaciones.TipoPrestacionConceptId}";
+                var collapseTipoId = $"collapse_{tipoPrestaciones.TipoPrestacionConceptId}";
+                var isExpanded = !hayMasDeUnTipo;
+
+                <div class="turnos-nuevo-accordion-item">
+                    <h2 class="turnos-nuevo-accordion-header" id="@tipoId">
+                        <button class="turnos-nuevo-accordion-button @(isExpanded ? "" : "collapsed")" type="button" data-bs-toggle="collapse" data-bs-target="#@collapseTipoId" aria-expanded="@(isExpanded ? "true" : "false")" aria-controls="@collapseTipoId">
+                            <Icon Name="calendar-check" Size="20" Fill="#87b867" class="me-2" AriaLabel="Prestación" />
+                            @tipoPrestaciones.TipoPrestacionTerm
+                        </button>
+                    </h2>
+                    <div id="@collapseTipoId" class="turnos-nuevo-accordion-collapse collapse @(isExpanded ? "show" : "")" aria-labelledby="@tipoId" data-bs-parent="#accAgendas">
+                        <div class="turnos-nuevo-accordion-body">
+                            <div class="turnos-nuevo-efectores-list">
+
+                                @foreach (var efector in tipoPrestaciones.Efectores)
+                                {
+                                    var turnosAgrupados = AgruparTurnosPorFecha(efector.TurnosDisponibles);
+                                    <EfectorCard EfectorNombre="@efector.Nombre" Domicilio="@efector.Domicilio">
+                                        @if (efector.TurnosDisponibles.Any())
+                                        {
+                                            <TurnoHorarioGrid TurnosPorFecha="@turnosAgrupados"
+                                                              OnTurnoSeleccionado="@(async (turno) => await HandleTurnoSeleccionado(turno))" />
+                                        }
+                                    </EfectorCard>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+    else
+    {
+        <EmptyState Message="No hay turnos disponibles." />
+    }
+</div>
+
+@code {
+    private List<TurnosPorTipoPrestacion> listaTurnosPorTipoPrestacion = [];
+
+    [CascadingParameter] IModalService Modal { get; set; } = default!;
+
+    private async Task ShowModalConfirmar(TurnoDisponible turno)
+    {
+        var options = new ModalOptions()
+        {
+            Size = ModalSize.Automatic,
+            Position = ModalPosition.TopCenter,
+            HideCloseButton = true,
+            HideHeader = true
+        };
+
+        string paciente = (User.GetNombre() ?? "") + " " + (User.GetApellido() ?? "");
+
+        var parameters = new ModalParameters()
+            .Add(nameof(RegistrarTurnoConfirmar.Paciente), paciente)
+            .Add(nameof(RegistrarTurnoConfirmar.TurnoDisponible), turno);
+
+        Modal.Show<RegistrarTurnoConfirmar>(parameters, options);
+    }
+
+    protected override async Task OnAuthenticatedInitializedAsync()
+    {
+        var pacienteId = PacienteId;
+        if (string.IsNullOrEmpty(pacienteId))
+            return;
+
+        _spinnerService.Show();
+
+        try
+        {
+            listaTurnosPorTipoPrestacion = await _obtenerTurnosDisponiblesUseCase.EjecutarAsync(pacienteId);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error al cargar las agendas de organizaciones");
+        }
+        finally
+        {
+            _spinnerService.Hide();
+        }
+    }
+
+    private List<TurnoFechaGrupo> AgruparTurnosPorFecha(List<TurnoDisponible> turnos)
+    {
+        return turnos
+            .GroupBy(t => t.FechaHora.Date)
+            .Select(g => new TurnoFechaGrupo
+            {
+                Fecha = g.Key,
+                Disponibles = g.Count(),
+                Turnos = g.OrderBy(t => t.FechaHora).ToList()
+            })
+            .OrderBy(g => g.Fecha)
+            .ToList();
+    }
+
+    private async Task HandleTurnoSeleccionado(TurnoDisponible turno)
+    {
+        _ = Telemetry.TrackClickAsync("turnos/seleccionar-horario", "/turnosnuevo", new { turnoId = turno.Id, efector = turno.NombreEfector });
+        await ShowModalConfirmar(turno);
+    }
+}

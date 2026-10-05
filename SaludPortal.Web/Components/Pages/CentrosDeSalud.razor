@@ -1,0 +1,121 @@
+@page "/centros-salud"
+@rendermode InteractiveServer
+
+@using SaludPortal.Web.Components.Shared
+@using SaludPortal.Application.UseCases.CentrosDeSalud
+@using SaludPortal.Application.Models.CentrosDeSalud
+
+@using SaludPortal.Web.Services
+@inject TelemetryService Telemetry
+@inject BlazorSpinner.SpinnerService _spinnerService
+@inject ObtenerDireccionPacienteUseCase _obtenerDireccionUseCase
+@inject ObtenerCentrosSaludUseCase _obtenerCentrosUseCase
+@inject ILogger<CentrosDeSalud> _logger
+
+@inherits AuthenticatedComponentBase
+
+<PageTitle>Centros de salud - Mi Salud</PageTitle>
+
+<div class="centros-salud-page">
+    <PageHeaderWithBack Title="Centros de Salud" 
+                        Subtitle="Encuentra los centros de salud más cercanos"
+                        BackHref="/"
+                        BackAriaLabel="Volver al Inicio" />
+    <div></div>
+
+    @if (_centrosLoaded)
+    {
+        <div class="centros-content">
+            <div class="mapa-column">
+                <CentrosSaludMap Centros="lstCentrosSalud" CentroSeleccionado="CentroSeleccionado"
+                    PacienteLatitud="_pacienteLatitud" PacienteLongitud="_pacienteLongitud" PacienteDireccion="_pacienteDireccion" />
+            </div>
+            <div class="lista-column">
+                <CentroSaludList 
+                    Centros="lstCentrosSalud" 
+                    SelectedOrigen="@_origenSeleccionado"
+                    SelectedCentroId="CentroSeleccionado?.Id"
+                    OnOrigenChanged="HandleOrigenChange"
+                    OnCentroSelected="HandleCentroSeleccionado" />
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="loading-state">
+            <p>Cargando centros de salud...</p>
+        </div>
+    }
+</div>
+
+@code {
+    private const string OrigenProvincia = "provincia";
+
+    private List<CentroSaludModel> lstCentrosSalud = new();
+    private CentroSaludModel? CentroSeleccionado;
+    private string _origenSeleccionado = OrigenProvincia;
+    private bool _centrosLoaded = false;
+
+    private double? _pacienteLatitud;
+    private double? _pacienteLongitud;
+    private string? _pacienteDireccion;
+
+    protected override async Task OnAuthenticatedInitializedAsync()
+    {
+        await Task.WhenAll(
+            CargarCentrosSalud(_origenSeleccionado),
+            CargarDireccionPaciente());
+    }
+
+    private async Task CargarDireccionPaciente()
+    {
+        if (string.IsNullOrWhiteSpace(PacienteId))
+            return;
+
+        var resultado = await _obtenerDireccionUseCase.EjecutarAsync(PacienteId);
+        if (resultado != null)
+        {
+            _pacienteLatitud = resultado.Latitud;
+            _pacienteLongitud = resultado.Longitud;
+            _pacienteDireccion = resultado.Direccion;
+        }
+    }
+
+    private async Task CargarCentrosSalud(string origen)
+    {
+        try
+        {
+            _centrosLoaded = false;
+            _spinnerService.Show();
+
+            lstCentrosSalud = await _obtenerCentrosUseCase.EjecutarAsync(origen);
+            _centrosLoaded = true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error cargando centros de salud");
+            _centrosLoaded = false;
+        }
+        finally
+        {
+            _spinnerService.Hide();
+        }
+    }
+
+    private async Task HandleOrigenChange(string origen)
+    {
+        if (string.IsNullOrWhiteSpace(origen) || origen == _origenSeleccionado)
+            return;
+
+        _ = Telemetry.TrackClickAsync("centros-salud/cambiar-origen", metadata: new { origen });
+        _origenSeleccionado = origen;
+        CentroSeleccionado = null;
+        await CargarCentrosSalud(_origenSeleccionado);
+    }
+
+    private void HandleCentroSeleccionado(CentroSaludModel centro)
+    {
+        _ = Telemetry.TrackClickAsync("centros-salud/seleccionar-centro", metadata: new { centro = centro.Nombre });
+        CentroSeleccionado = centro;
+    }
+}

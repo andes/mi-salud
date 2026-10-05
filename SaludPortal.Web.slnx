@@ -1,0 +1,9 @@
+<Solution>
+  <Project Path="SaludPortal.Web/SaludPortal.Web.csproj" />
+  <Project Path="SaludPortal.Application/SaludPortal.Application.csproj" />
+  <Project Path="AndesServices/AndesServices.csproj" />
+  <Project Path="RecetarServices/RecetarServices.csproj" />
+  <Project Path="LachybsServices/LachybsServices.csproj" />
+  <Project Path="XroadssAndesServices/XroadssAndesServices.csproj" />
+  <Project Path="AdminLogsServices/AdminLogsServices.csproj" />
+</Solution>

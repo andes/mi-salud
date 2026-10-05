@@ -1,0 +1,60 @@
+﻿@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.Components.Rendering
+
+@* <Router AppAssembly="typeof(Program).Assembly">
+    <Found Context="routeData">
+        <RouteView RouteData="routeData" DefaultLayout="typeof(Layout.LoginLayout)" />
+        <FocusOnNavigate RouteData="routeData" Selector="h1" />
+    </Found>
+</Router> *@
+
+<CascadingAuthenticationState>
+    <CascadingBlazoredModal>
+        <TelemetryTracker />
+        <Router AppAssembly="typeof(Program).Assembly">
+            <Found Context="routeData">
+                <AuthorizeRouteView RouteData="routeData" DefaultLayout="typeof(Layout.MainLayout)">
+                    <NotAuthorized>
+                        <RequireAuthenticationRedirect />
+                    </NotAuthorized>
+                </AuthorizeRouteView>
+                <FocusOnNavigate RouteData="routeData" Selector="h1" />
+            </Found>
+            <NotFound>
+                <LayoutView Layout="typeof(Layout.LoginLayout)">
+                    <p>Página no encontrada.</p>
+                </LayoutView>
+            </NotFound>
+            @* <AuthorizeView>
+                    <Authorized>
+                        <AuthorizeRouteView RouteData="routeData" DefaultLayout="typeof(Layout.MainLayout)" />
+                    </Authorized>
+                    <NotAuthorized>
+                        <CascadingAuthenticationState>
+                            <LayoutView Layout="typeof(Layout.LoginLayout)" />
+                        </CascadingAuthenticationState>
+                    </NotAuthorized>
+                </AuthorizeView>
+            </Found>
+            <NotFound>
+                <CascadingAuthenticationState>
+                    <p>Página no encontrada....</p>
+                </CascadingAuthenticationState>
+            </NotFound> *@
+        </Router>
+    </CascadingBlazoredModal>
+</CascadingAuthenticationState>
+@* <CascadingAuthenticationState>
+    <CascadingBlazoredModal>
+        <Router AppAssembly="typeof(Program).Assembly">
+            <Found Context="routeData">
+                <RouteView RouteData="routeData" DefaultLayout="typeof(Layout.MainLayout)" />
+            </Found>
+            <NotFound>
+                <LayoutView Layout="typeof(Layout.LoginLayout)">
+                    <p>Página no encontrada....</p>
+                </LayoutView>
+            </NotFound>
+        </Router>
+    </CascadingBlazoredModal>
+</CascadingAuthenticationState> *@
