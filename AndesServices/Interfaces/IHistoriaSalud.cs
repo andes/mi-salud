@@ -20,7 +20,7 @@ namespace AndesServices.Interfaces
         /// <returns>Lista de prestaciones de la historia de salud para una categoria.</returns>
         Task<List<PrestacionHistoriaSalud>> ObtenerPrestacionesAsync(string tipoPrestaciones, string idPaciente, string estado = "validada");
 
-        Task<Byte[]?> DescargarCDAFilePorIdAsync(string id);
+        Task<Byte[]?> DescargarCDAFilePorIdAsync(string id, string fileToken);
 
         Task<Byte[]?> DescargarPdfPrestacionAsync(string idPrestacion);
 

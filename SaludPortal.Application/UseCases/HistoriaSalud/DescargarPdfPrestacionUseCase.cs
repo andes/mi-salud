@@ -23,7 +23,11 @@ public class DescargarPdfPrestacionUseCase
                 idDescarga = adjunto.Substring(adjunto.LastIndexOf('/') + 1, adjunto.LastIndexOf('.') - adjunto.LastIndexOf('/') - 1);
             }
 
-            return await _historiaSaludService.DescargarCDAFilePorIdAsync(idDescarga);
+            var fileToken = await _historiaSaludService.ObtenerFileTokenAsync();
+            if (string.IsNullOrEmpty(fileToken))
+                return null;
+
+            return await _historiaSaludService.DescargarCDAFilePorIdAsync(idDescarga, fileToken);
         }
 
         return await _historiaSaludService.DescargarPdfPrestacionAsync(prestacionId);

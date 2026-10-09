@@ -1,5 +1,6 @@
 ﻿using AndesServices.DTOs.Prestaciones;
 using AndesServices.Entities;
+using AndesServices.Helpers;
 using AndesServices.Interfaces;
 using Newtonsoft.Json.Linq;
 using System.Reflection;
@@ -10,6 +11,7 @@ namespace AndesServices.Services
     {
         private readonly ILogger<HistoriaSaludService> _logger;
         private readonly HttpClient _andesClient;
+        private readonly HttpClient _andesNoJwtClient;
 
         public HistoriaSaludService(
             IHttpClientFactory httpClientFactory,
@@ -17,6 +19,7 @@ namespace AndesServices.Services
         {
             _logger = logger;
             _andesClient = httpClientFactory.CreateClient("Andes");
+            _andesNoJwtClient = httpClientFactory.CreateClient("Andes-NoJWT");
         }
 
         // Implementación de los métodos de la interfaz IHistoriaSalud
@@ -121,15 +124,14 @@ namespace AndesServices.Services
             return null;
         }
 
-        public async Task<Byte[]?> DescargarCDAFilePorIdAsync(string id)
+        public async Task<Byte[]?> DescargarCDAFilePorIdAsync(string id, string fileToken)
         {
             byte[] unByte = null;
 
             try
             {
-                
-                //var parametrosBody = new StringContent("{\"protocolo\":{\"data\":{\"idProtocolo\":" + idProtocolo + ",\"documento\":" + documento + "}}}", System.Text.Encoding.UTF8, "application/json");
-                using (HttpResponseMessage res = await _andesClient.GetAsync($"modules/cda/{id}"))
+                // Sin header JWT: Andes prioriza el header sobre ?token= y el módulo CDA rechaza paciente-token.
+                using (HttpResponseMessage res = await _andesNoJwtClient.GetAsync($"modules/cda/{id}?token={Uri.EscapeDataString(fileToken)}"))
                 {
                     if (res.IsSuccessStatusCode)
                     {
@@ -140,8 +142,16 @@ namespace AndesServices.Services
                             return await Task.FromResult(unByte);
                         }
 
-                        return fileResponse;
+                        var pdf = CdaPdfHelper.NormalizarPdf(fileResponse);
+                        if (pdf == null)
+                        {
+                            _logger.LogWarning("La respuesta del CDA {Id} no es un PDF ni Base64 válido.", id);
+                        }
+
+                        return pdf;
                     }
+
+                    _logger.LogWarning("El endpoint CDA devolvió {Status} para el CDA {Id}.", res.StatusCode, id);
                 }
             }
             catch (Exception exception)

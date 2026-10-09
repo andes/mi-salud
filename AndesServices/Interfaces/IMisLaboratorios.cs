@@ -13,6 +13,6 @@ namespace AndesServices.Interfaces
         Task<MisLaboratorios> ObtenerLaboratorioPorIdAsync(string idProtocolo);
         Task<Byte[]> DescargarLaboratorioPorIdAsync(string idProtocolo, string documento);
 
-        Task<Byte[]> DescargarLaboratorioCDAPorIdAsync(string documento);
+        Task<Byte[]> DescargarLaboratorioCDAPorIdAsync(string documento, string fileToken);
     }
 }

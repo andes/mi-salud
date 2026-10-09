@@ -6,11 +6,16 @@ namespace SaludPortal.Application.UseCases.Laboratorios;
 public class DescargarInformeLaboratorioUseCase
 {
     private readonly IMisLaboratorios _laboratoriosService;
+    private readonly IHistoriaSalud _historiaSaludService;
     private readonly IXroadssRaniaService _raniaService;
 
-    public DescargarInformeLaboratorioUseCase(IMisLaboratorios laboratoriosService, IXroadssRaniaService raniaService)
+    public DescargarInformeLaboratorioUseCase(
+        IMisLaboratorios laboratoriosService,
+        IHistoriaSalud historiaSaludService,
+        IXroadssRaniaService raniaService)
     {
         _laboratoriosService = laboratoriosService;
+        _historiaSaludService = historiaSaludService;
         _raniaService = raniaService;
     }
 
@@ -28,7 +33,12 @@ public class DescargarInformeLaboratorioUseCase
                 var adjunto = cdaAdjuntos[0];
                 var idDescarga = adjunto.Substring(adjunto.LastIndexOf('/') + 1);
                 idDescarga = idDescarga.Substring(0, idDescarga.LastIndexOf('.'));
-                return await _laboratoriosService.DescargarLaboratorioCDAPorIdAsync(idDescarga);
+
+                var fileToken = await _historiaSaludService.ObtenerFileTokenAsync();
+                if (string.IsNullOrEmpty(fileToken))
+                    return null;
+
+                return await _laboratoriosService.DescargarLaboratorioCDAPorIdAsync(idDescarga, fileToken);
 
             default: // rup
                 return await _laboratoriosService.DescargarLaboratorioPorIdAsync(idProtocolo, documento);
