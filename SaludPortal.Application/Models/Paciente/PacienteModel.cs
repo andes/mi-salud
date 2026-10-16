@@ -20,6 +20,8 @@ public class PacienteModel
     public string? Telefono { get; set; }
     public string? Cuil { get; set; }
     public string? FotoId { get; set; }
+    public string? FotoMobile { get; set; }
+    public string? Nacionalidad { get; set; }
     public string? Estado { get; set; }
     public bool? Activo { get; set; }
     public DateTime? CreadoEn { get; set; }
@@ -72,8 +74,11 @@ public class FinanciadorModel
 {
     public int? CodigoPuco { get; set; }
     public string? Nombre { get; set; }
+    public string? NumeroAfiliado { get; set; }
+    public string? Id { get; set; }
+    public int? IdObraSocial { get; set; }
     public string? Origen { get; set; }
-    public DateTime FechaDeActualizacion { get; set; }
+    public DateTime? FechaDeActualizacion { get; set; }
     public bool Prepaga { get; set; }
 }
 
@@ -103,12 +108,14 @@ public class DocumentoAdjuntoModel
 
 public class DireccionModel
 {
+    public string? Tipo { get; set; }
     public List<double>? GeoReferencia { get; set; }
     public bool Activo { get; set; }
     public DateTime? UltimaActualizacion { get; set; }
     public int? Ranking { get; set; }
     public string? CodigoPostal { get; set; }
     public string? Valor { get; set; }
+    public bool? SituacionCalle { get; set; }
     public UbicacionModel? Ubicacion { get; set; }
 }
 
@@ -131,10 +138,11 @@ public class RelacionTipoModel
 public class RelacionModel
 {
     public RelacionTipoModel? Relacion { get; set; }
+    public string? Referencia { get; set; }
     public string? Nombre { get; set; }
     public string? Apellido { get; set; }
     public string? Documento { get; set; }
-    public DateTime FechaNacimiento { get; set; }
+    public DateTime? FechaNacimiento { get; set; }
     public DateTime? FechaFallecimiento { get; set; }
     public bool Activo { get; set; }
 }

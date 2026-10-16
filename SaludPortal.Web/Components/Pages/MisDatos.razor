@@ -3,11 +3,14 @@
 
 @using Microsoft.AspNetCore.Components.Authorization
 @using Microsoft.AspNetCore.Components.Forms
+@using Microsoft.JSInterop
 @using SaludPortal.Web.Services
 @using AndesServices.Interfaces
 @using AndesServices.Entities
 @using SaludPortal.Web.Components.Shared
 @using SaludPortal.Web.Models
+
+@inject IJSRuntime JS
 
 @inherits AuthenticatedComponentBase
 
@@ -145,9 +148,11 @@ else
                                    id="codigoPostal"
                                    inputmode="numeric"
                                    class="form-control"
-                                   @bind="CodigoPostalValue"
-                                   @bind:event="oninput"
+                                   @ref="_codigoPostalRef"
+                                   value="@formModel.CodigoPostal"
+                                   @oninput="OnCodigoPostalInput"
                                    onkeydown="numericInput.preventNonNumeric(event)"
+                                   onpaste="numericInput.pasteDigitsOnly(event)"
                                    maxlength="4"
                                    disabled="@(!modoEdicion)"
                                    aria-label="Código postal" />
@@ -183,9 +188,11 @@ else
                            inputmode="numeric"
                            class="form-control @(errorCelular ? "is-invalid" : "")"
                            placeholder="Ingrese el número de celular (sin 0 inicial, sin 15)"
-                           @bind="CelularValue"
-                           @bind:event="oninput"
+                           @ref="_celularRef"
+                           value="@celular"
+                           @oninput="OnCelularInput"
                            onkeydown="numericInput.preventNonNumeric(event)"
+                           onpaste="numericInput.pasteDigitsOnly(event)"
                            maxlength="@LONGITUD_MAXIMA_CELULAR"
                            disabled="@(!modoEdicion)"
                            aria-label="Número de celular" />

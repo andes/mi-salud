@@ -34,6 +34,7 @@ namespace AndesServices
         {
             return new ActualizarPacienteDireccionDto
             {
+                Tipo = direccion.tipo,
                 GeoReferencia = direccion.geoReferencia?.ToList() ?? new List<double>(),
                 Activo = direccion.activo,
                 IdInterno = direccion._id,
@@ -42,6 +43,7 @@ namespace AndesServices
                 Ranking = direccion.ranking,
                 CodigoPostal = direccion.codigoPostal,
                 Valor = direccion.valor,
+                SituacionCalle = direccion.situacionCalle,
                 Id = direccion.id
             };
         }

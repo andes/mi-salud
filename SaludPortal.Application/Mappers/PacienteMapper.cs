@@ -27,6 +27,8 @@ public static class PacienteMapper
             Telefono = paciente.telefono,
             Cuil = paciente.cuil,
             FotoId = paciente.fotoId,
+            FotoMobile = paciente.fotoMobile,
+            Nacionalidad = paciente.nacionalidad,
             Estado = paciente.estado,
             Activo = paciente.activo,
             CreadoEn = paciente.createdAt,
@@ -79,12 +81,14 @@ public static class PacienteMapper
     {
         return new DireccionModel
         {
+            Tipo = direccion.tipo,
             GeoReferencia = direccion.geoReferencia,
             Activo = direccion.activo,
             UltimaActualizacion = direccion.ultimaActualizacion,
             Ranking = direccion.ranking,
             CodigoPostal = direccion.codigoPostal,
             Valor = direccion.valor,
+            SituacionCalle = direccion.situacionCalle,
             Ubicacion = MapUbicacion(direccion.ubicacion)
         };
     }
@@ -116,6 +120,9 @@ public static class PacienteMapper
         {
             CodigoPuco = financiador.codigoPuco,
             Nombre = financiador.nombre,
+            NumeroAfiliado = financiador.numeroAfiliado,
+            Id = financiador.id,
+            IdObraSocial = financiador.idObraSocial,
             Origen = financiador.origen,
             FechaDeActualizacion = financiador.fechaDeActualizacion,
             Prepaga = financiador.prepaga
@@ -138,6 +145,7 @@ public static class PacienteMapper
 
     private static RelacionModel MapRelacion(Relacion relacion)
     {
+        var refPaciente = relacion.referencia;
         return new RelacionModel
         {
             Relacion = relacion.relacion == null ? null : new RelacionTipoModel
@@ -146,12 +154,13 @@ public static class PacienteMapper
                 Opuesto = relacion.relacion.opuesto,
                 EsConviviente = relacion.relacion.esConviviente
             },
-            Nombre = relacion.nombre,
-            Apellido = relacion.apellido,
-            Documento = relacion.documento,
-            FechaNacimiento = relacion.fechaNacimiento,
-            FechaFallecimiento = relacion.fechaFallecimiento,
-            Activo = relacion.activo
+            Referencia = refPaciente?.id ?? refPaciente?._id,
+            Nombre = refPaciente?.nombre,
+            Apellido = refPaciente?.apellido,
+            Documento = refPaciente?.documento,
+            FechaNacimiento = refPaciente?.fechaNacimiento,
+            FechaFallecimiento = refPaciente?.fechaFallecimiento,
+            Activo = refPaciente?.activo ?? false
         };
     }
 

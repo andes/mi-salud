@@ -2,6 +2,7 @@
 @using SaludPortal.Web.Components.Shared
 @using SaludPortal.Application.Models.CentrosDeSalud
 @using System.Linq
+@implements IAsyncDisposable
 
 <div class="centro-salud-list-container">
     <div class="filters-section">
@@ -18,11 +19,11 @@
         </div>
 
         <div class="search-section">
-            <input type="text" 
-                   class="search-input" 
-                   placeholder="Buscar por nombre..." 
-                   @bind="SearchTerm" 
-                   @bind:event="oninput"
+            @* Sin value= controlado: el DOM conserva el texto; solo se debouncea el filtro. *@
+            <input type="text"
+                   class="search-input"
+                   placeholder="Buscar por nombre..."
+                   @oninput="OnSearchInput"
                    aria-label="Búsqueda de centros de salud" />
         </div>
     </div>
@@ -52,6 +53,8 @@
 </div>
 
 @code {
+    private const int SearchDebounceMs = 250;
+
     [Parameter]
     public List<CentroSaludModel> Centros { get; set; } = new();
 
@@ -67,22 +70,42 @@
     [Parameter]
     public EventCallback<string> OnOrigenChanged { get; set; }
 
-    private string SearchTerm { get; set; } = string.Empty;
+    private string FilterTerm { get; set; } = string.Empty;
+    private CancellationTokenSource? _searchDebounceCts;
 
     private IEnumerable<CentroSaludModel> FilteredCentros
     {
         get
         {
-            if (string.IsNullOrWhiteSpace(SearchTerm))
+            if (string.IsNullOrWhiteSpace(FilterTerm))
                 return Centros;
 
-            var searchLower = SearchTerm.ToLower();
+            var searchLower = FilterTerm.ToLower();
             return Centros.Where(c => 
                 (c.Nombre?.ToLower().Contains(searchLower) ?? false) ||
                 (c.Direccion?.ToLower().Contains(searchLower) ?? false) ||
                 (c.Region?.ToLower().Contains(searchLower) ?? false) ||
                 (c.Comunidad?.ToLower().Contains(searchLower) ?? false)
             ).ToList();
+        }
+    }
+
+    private async Task OnSearchInput(ChangeEventArgs e)
+    {
+        var text = e.Value?.ToString() ?? string.Empty;
+
+        _searchDebounceCts?.Cancel();
+        _searchDebounceCts?.Dispose();
+        _searchDebounceCts = new CancellationTokenSource();
+        var token = _searchDebounceCts.Token;
+
+        try
+        {
+            await Task.Delay(SearchDebounceMs, token);
+            FilterTerm = text;
+        }
+        catch (TaskCanceledException)
+        {
         }
     }
 
@@ -100,5 +123,13 @@
         {
             await OnOrigenChanged.InvokeAsync(origen);
         }
+    }
+
+    public ValueTask DisposeAsync()
+    {
+        _searchDebounceCts?.Cancel();
+        _searchDebounceCts?.Dispose();
+        _searchDebounceCts = null;
+        return ValueTask.CompletedTask;
     }
 }

@@ -55,6 +55,10 @@ public class ActualizarPacienteContactoDto
 
 public class ActualizarPacienteDireccionDto
 {
+    [JsonProperty("tipo")]
+    [JsonPropertyName("tipo")]
+    public string? Tipo { get; set; }
+
     [JsonProperty("geoReferencia")]
     [JsonPropertyName("geoReferencia")]
     public List<double> GeoReferencia { get; set; } = [];
@@ -86,6 +90,10 @@ public class ActualizarPacienteDireccionDto
     [JsonProperty("valor")]
     [JsonPropertyName("valor")]
     public string? Valor { get; set; }
+
+    [JsonProperty("situacionCalle")]
+    [JsonPropertyName("situacionCalle")]
+    public bool? SituacionCalle { get; set; }
 
     [JsonProperty("id")]
     [JsonPropertyName("id")]

@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Components;
+using Microsoft.JSInterop;
 using SaludPortal.Web.Components.Shared;
 using SaludPortal.Web.Services;
 using AndesServices;
@@ -33,6 +34,14 @@ namespace SaludPortal.Web.Components.Pages
         private string celular = "";
         private bool errorCelular = false;
         private const int LONGITUD_MAXIMA_CELULAR = 10;
+
+        private ElementReference _celularRef;
+        private ElementReference _codigoPostalRef;
+        private bool _sanitizeAttached;
+        private int _celularInputSeq;
+        private int _codigoPostalInputSeq;
+        private string _celularLatest = "";
+        private string _codigoPostalLatest = "";
 
         // Expresiones regulares para validación
         private static readonly Regex SoloNumerosRegex = new Regex(@"[^\d]", RegexOptions.Compiled);
@@ -221,60 +230,58 @@ namespace SaludPortal.Web.Components.Pages
             await CargarLocalidadesIniciales();
         }
 
-        // Propiedad para el celular con setter personalizado
-        private string CelularValue
+        private async Task OnCelularInput(ChangeEventArgs e)
         {
-            get => celular;
-            set
-            {
-                string valor = value ?? "";
+            // Dígitos ya sanitizados en JS (capture). Solo el último keystroke confirma el modelo.
+            string valor = e.Value?.ToString() ?? "";
 
-                // Eliminar cualquier carácter que no sea número
-                valor = SoloNumerosRegex.Replace(valor, "");
+            if (IniciaConCeroRegex.IsMatch(valor))
+                valor = IniciaConCeroRegex.Replace(valor, "");
+            if (IniciaConQuinceRegex.IsMatch(valor))
+                valor = IniciaConQuinceRegex.Replace(valor, "");
+            if (valor.Length > LONGITUD_MAXIMA_CELULAR)
+                valor = valor[..LONGITUD_MAXIMA_CELULAR];
 
-                // Si empieza con 0 o 15, dejarlo vacío
-                if (IniciaConCeroRegex.IsMatch(valor))
-                {
-                    celular = IniciaConCeroRegex.Replace(valor, "");
-                    errorCelular = false;
-                    return;
-                }
-                if (IniciaConQuinceRegex.IsMatch(valor))
-                {
-                    celular = IniciaConQuinceRegex.Replace(valor, "");
-                    errorCelular = false;
-                    return;
-                }
+            _celularLatest = valor;
+            celular = valor;
+            errorCelular = false;
+            var seq = ++_celularInputSeq;
+            await Task.Yield();
+            if (seq != _celularInputSeq)
+                return;
 
-                // Limitar a máximo 10 dígitos
-                if (valor.Length > LONGITUD_MAXIMA_CELULAR)
-                {
-                    valor = valor.Substring(0, LONGITUD_MAXIMA_CELULAR);
-                }
-
-                celular = valor;
-                errorCelular = false;
-            }
+            celular = _celularLatest;
         }
 
-        // Propiedad para el código postal con setter personalizado
-        private string CodigoPostalValue
+        private async Task OnCodigoPostalInput(ChangeEventArgs e)
         {
-            get => formModel.CodigoPostal;
-            set
+            string valor = e.Value?.ToString() ?? "";
+            if (valor.Length > 4)
+                valor = valor[..4];
+
+            _codigoPostalLatest = valor;
+            formModel.CodigoPostal = valor;
+            var seq = ++_codigoPostalInputSeq;
+            await Task.Yield();
+            if (seq != _codigoPostalInputSeq)
+                return;
+
+            formModel.CodigoPostal = _codigoPostalLatest;
+        }
+
+        protected override async Task OnAfterRenderAsync(bool firstRender)
+        {
+            if (_sanitizeAttached || !modoEdicion)
+                return;
+
+            try
             {
-                string valor = value ?? "";
-
-                // Eliminar cualquier carácter que no sea número
-                valor = SoloNumerosRegex.Replace(valor, "");
-
-                // Limitar a máximo 4 dígitos
-                if (valor.Length > 4)
-                {
-                    valor = valor.Substring(0, 4);
-                }
-
-                formModel.CodigoPostal = valor;
+                await JS.InvokeVoidAsync("numericInput.attachSanitize", _celularRef);
+                await JS.InvokeVoidAsync("numericInput.attachSanitize", _codigoPostalRef);
+                _sanitizeAttached = true;
+            }
+            catch (JSException)
+            {
             }
         }
 

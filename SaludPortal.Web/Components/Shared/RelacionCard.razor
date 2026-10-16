@@ -3,14 +3,14 @@
 
 <div class="relacion-card">
     <div class="relacion-header">
-        <span class="relacion-tipo">@Relacion.relacion.nombre</span>
+        <span class="relacion-tipo">@(Relacion.relacion?.nombre)</span>
     </div>
     <div class="relacion-body">
-        @if (!string.IsNullOrWhiteSpace(Relacion.nombre) || !string.IsNullOrWhiteSpace(Relacion.apellido))
+        @if (!string.IsNullOrWhiteSpace(Relacion.referencia?.nombre) || !string.IsNullOrWhiteSpace(Relacion.referencia?.apellido))
         {
             <div class="relacion-nombre">
                 <span class="relacion-label">Nombre completo:</span>
-                <span class="relacion-value">@Relacion.apellido @Relacion.nombre</span>
+                <span class="relacion-value">@Relacion.referencia?.apellido @Relacion.referencia?.nombre</span>
             </div>
         }
     </div>

@@ -18,7 +18,7 @@
                class="input-field"
                placeholder="@Placeholder"
                @ref="_inputRef"
-               value="@Value"
+               value="@DisplayValue"
                @oninput="OnInput"
                onkeydown="numericInput.preventNonNumeric(event)"
                onpaste="numericInput.pasteDigitsOnly(event)"
@@ -26,7 +26,7 @@
                disabled="@Disabled" />
     </div>
     <div class="field-hint">
-        <small class="text-muted">Solo números, hasta @LONGITUD_MAXIMA dígitos. Total: @(Value?.Length ?? 0)/@LONGITUD_MAXIMA</small>
+        <small class="text-muted">Solo números, hasta @LONGITUD_MAXIMA dígitos. Total: @_hintLength/@LONGITUD_MAXIMA</small>
     </div>
     <ValidationMessage For="@ValidationFor" class="validation-message" style="color: #dc3545;" />
 </div>
@@ -48,11 +48,24 @@
     private bool _sanitizeAttached;
     private int _inputSeq;
     private string _latest = "";
+    private int _hintLength;
+
+    private string DisplayValue => _inputSeq > 0 ? _latest : Value;
+
+    protected override void OnParametersSet()
+    {
+        if (_inputSeq == 0)
+        {
+            _latest = Value ?? "";
+            _hintLength = _latest.Length;
+        }
+    }
 
     private async Task OnInput(ChangeEventArgs e)
     {
         // Valor ya sanitizado en JS (capture). Solo el último keystroke actualiza el modelo.
         _latest = e.Value?.ToString() ?? "";
+        _hintLength = _latest.Length;
         var seq = ++_inputSeq;
         await Task.Yield();
         if (seq != _inputSeq)

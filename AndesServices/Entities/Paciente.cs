@@ -1,7 +1,5 @@
-﻿using System.Text.Json;
-using System.Text.Json.Serialization;
+﻿using System.Text.Json.Serialization;
 using AndesServices.Converters;
-using static System.Runtime.InteropServices.JavaScript.JSType;
 
 namespace AndesServices.Entities
 {
@@ -32,7 +30,7 @@ namespace AndesServices.Entities
         public List<Direccion>? direccion { get; set; }
         public List<Relacion>? relaciones { get; set; }
         public List<Financiador>? financiador { get; set; }
-        public List<object>? notas { get; set; }
+        public List<Nota>? notas { get; set; }
         public List<DocumentoAdjunto>? documentos { get; set; }
         public string? cuil { get; set; }
         public bool? activo { get; set; }
@@ -41,6 +39,8 @@ namespace AndesServices.Entities
         public DateTime? fechaFallecimiento { get; set; }
         public string? estadoCivil { get; set; }
         public string? fotoId { get; set; }
+        public string? nacionalidad { get; set; }
+        public string? fotoMobile { get; set; }
         public string? scan { get; set; }
         public bool? reportarError { get; set; }
         public string? nombreCorrectoReportado { get; set; }
@@ -70,10 +70,10 @@ namespace AndesServices.Entities
 
     public class LugarNacimiento
     {
-        public Pais pais { get; set; }
-        public object provincia { get; set; }
-        public object localidad { get; set; }
-        public object lugar { get; set; }
+        public Pais? pais { get; set; }
+        public Pais? provincia { get; set; }
+        public Pais? localidad { get; set; }
+        public string? lugar { get; set; }
     }
 
     public class Contacto
@@ -85,40 +85,70 @@ namespace AndesServices.Entities
         public string? valor { get; set; }
         public string? tipo { get; set; }
         public string? id { get; set; }
-
     }
+
+    /// <summary>
+    /// Andes contract: { relacion, referencia }. referencia may be an ObjectId string
+    /// or a populated patient object (as in mobileApp GET).
+    /// </summary>
     public class Relacion
     {
-        public string _id { get; set; }
-        public RelacionTipo relacion { get; set; }
-        public string referencia { get; set; }
-        public string nombre { get; set; }
-        public string apellido { get; set; }
-        public string documento { get; set; }
-        public DateTime fechaNacimiento { get; set; }
+        public string? _id { get; set; }
+        public RelacionTipo? relacion { get; set; }
+        [JsonConverter(typeof(RelacionReferenciaConverter))]
+        public RelacionReferencia? referencia { get; set; }
+        public string? id { get; set; }
+    }
+
+    public class RelacionReferencia
+    {
+        public string? _id { get; set; }
+        public string? id { get; set; }
+        public string? documento { get; set; }
+        public string? nombre { get; set; }
+        public string? apellido { get; set; }
+        public string? sexo { get; set; }
+        public string? genero { get; set; }
+        public DateTime? fechaNacimiento { get; set; }
         public DateTime? fechaFallecimiento { get; set; }
-        public string numeroIdentificacion { get; set; }
-        public string fotoId { get; set; }
+        public string? numeroIdentificacion { get; set; }
+        public string? fotoId { get; set; }
         public bool activo { get; set; }
-        public string id { get; set; }
+        public List<string>? vinculos { get; set; }
+        public string? nombreCompleto { get; set; }
+        public int? edad { get; set; }
+        public EdadReal? edadReal { get; set; }
     }
 
     public class RelacionTipo
     {
-        public string _id { get; set; }
-        public string nombre { get; set; }
-        public string opuesto { get; set; }
+        public string? _id { get; set; }
+        public string? nombre { get; set; }
+        public string? opuesto { get; set; }
         public bool esConviviente { get; set; }
-        public string id { get; set; }
+        public string? id { get; set; }
+    }
+
+    public class Nota
+    {
+        public string? _id { get; set; }
+        public DateTime? fecha { get; set; }
+        public string? titulo { get; set; }
+        public string? nota { get; set; }
+        public bool? destacada { get; set; }
+        public string? id { get; set; }
     }
 
     public class Financiador
     {
         public int? codigoPuco { get; set; }
-        public string nombre { get; set; }
-        public string financiador { get; set; }
-        public string origen { get; set; }
-        public DateTime fechaDeActualizacion { get; set; }
+        public string? nombre { get; set; }
+        public string? financiador { get; set; }
+        public string? numeroAfiliado { get; set; }
+        public string? id { get; set; }
+        public int? idObraSocial { get; set; }
+        public string? origen { get; set; }
+        public DateTime? fechaDeActualizacion { get; set; }
         public bool prepaga { get; set; }
     }
 
@@ -126,7 +156,7 @@ namespace AndesServices.Entities
     {
         public string entidad { get; set; }
         public string valor { get; set; }
-        public string id { get; set; }
+        public string? id { get; set; }
     }
     public class DocumentoAdjunto
     {

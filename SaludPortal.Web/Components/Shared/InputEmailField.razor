@@ -16,7 +16,7 @@
                inputmode="email"
                class="input-field"
                placeholder="@Placeholder"
-               value="@Value"
+               value="@DisplayValue"
                @oninput="OnInput"
                @onchange="OnChange"
                maxlength="@MaxLength"
@@ -39,15 +39,28 @@
 
     private static readonly Regex EspaciosRegex = new Regex(@"\s", RegexOptions.Compiled);
 
+    private int _inputSeq;
+    private string _latest = "";
+
+    // Mientras se escribe, pintar _latest para que un re-render intermedio no pise teclas.
+    private string DisplayValue => _inputSeq > 0 ? _latest : Value;
+
     private async Task OnInput(ChangeEventArgs e)
     {
-        // Actualizar el modelo en cada tecla sin mutar, para que OnValidSubmit vea el valor.
-        await ValueChanged.InvokeAsync(e.Value?.ToString() ?? "");
+        // Solo el último keystroke actualiza el modelo (evita carrera Blazor Server).
+        _latest = e.Value?.ToString() ?? "";
+        var seq = ++_inputSeq;
+        await Task.Yield();
+        if (seq != _inputSeq)
+            return;
+
+        await ValueChanged.InvokeAsync(_latest);
     }
 
     private async Task OnChange(ChangeEventArgs e)
     {
         string valor = EspaciosRegex.Replace(e.Value?.ToString() ?? "", "").ToLowerInvariant();
+        _latest = valor;
         if (!string.Equals(valor, Value, StringComparison.Ordinal))
             await ValueChanged.InvokeAsync(valor);
     }

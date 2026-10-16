@@ -17,6 +17,10 @@ namespace AndesServices.Services
             _andesClient = httpClientFactory.CreateClient("Andes");;
         }
 
+        /// <summary>
+        /// GET modules/mobileApp/paciente/:id — respuesta MPI (PacienteSchema + virtuals/audit).
+        /// Excluye claveBlocking, entidadesValidadoras, carpetaEfectores, createdBy.
+        /// </summary>
         public async Task<Paciente> ObtenerPacientePorIdAsync(string idPaciente, string? token = null)
         {
             try
@@ -80,7 +84,9 @@ namespace AndesServices.Services
             }
         }
 
-        // Modifica datos personales de un Paciente
+        /// <summary>
+        /// PATCH modules/mobileApp/pacientes/:id — body ActualizarPacienteDto; respuesta Paciente actualizado.
+        /// </summary>
         public async Task<Paciente> ModificarDatos(string idPaciente, ActualizarPacienteDto dto)
         {
             if (dto == null)
