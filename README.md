@@ -24,7 +24,7 @@ Solución: `[SaludPortal.Web.slnx](SaludPortal.Web.slnx)`.
 
 ## Requisitos
 
-- [.NET SDK 9](https://dotnet.microsoft.com/download) (9.0.200+ para `.slnx`)
+- [.NET SDK 10](https://dotnet.microsoft.com/download)
 - Docker (opcional, para publicar imagen)
 
 
