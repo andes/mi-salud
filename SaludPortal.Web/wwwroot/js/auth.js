@@ -154,3 +154,17 @@ window.authApi = (function () {
     };
 
 })();
+
+window.misaludAccountMenu = {
+    show: function () {
+        var toggle = document.getElementById('dropdownMenuMiCuenta');
+        if (!toggle || typeof bootstrap === 'undefined') return;
+        bootstrap.Dropdown.getOrCreateInstance(toggle).show();
+    },
+    hide: function () {
+        var toggle = document.getElementById('dropdownMenuMiCuenta');
+        if (!toggle || typeof bootstrap === 'undefined') return;
+        var instance = bootstrap.Dropdown.getInstance(toggle);
+        if (instance) instance.hide();
+    }
+};

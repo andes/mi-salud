@@ -10,6 +10,9 @@ main {
 
 .sidebar {
     background-image: linear-gradient(180deg, #2b3e4c 50%, #87b867);
+    position: relative;
+    z-index: 1030;
+    overflow: visible;
 }
 
 .top-row {

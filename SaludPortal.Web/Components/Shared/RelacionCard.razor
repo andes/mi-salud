@@ -1,22 +1,145 @@
 @using AndesServices.Entities
 @using Microsoft.AspNetCore.Components
 
-<div class="relacion-card">
+<div class="relacion-card @(EsPerfilActivo ? "relacion-card--activo" : null)">
     <div class="relacion-header">
         <span class="relacion-tipo">@(Relacion.relacion?.nombre)</span>
     </div>
     <div class="relacion-body">
-        @if (!string.IsNullOrWhiteSpace(Relacion.referencia?.nombre) || !string.IsNullOrWhiteSpace(Relacion.referencia?.apellido))
+        @if (!string.IsNullOrWhiteSpace(NombreCompleto))
         {
-            <div class="relacion-nombre">
-                <span class="relacion-label">Nombre completo:</span>
-                <span class="relacion-value">@Relacion.referencia?.apellido @Relacion.referencia?.nombre</span>
+            <div class="relacion-field">
+                <span class="relacion-label">Nombre completo</span>
+                <span class="relacion-value">@NombreCompleto</span>
+            </div>
+        }
+        @if (!string.IsNullOrWhiteSpace(Ref?.documento))
+        {
+            <div class="relacion-field">
+                <span class="relacion-label">Documento</span>
+                <span class="relacion-value">@Ref.documento</span>
+            </div>
+        }
+        @if (EdadMostrada is int edad)
+        {
+            <div class="relacion-field">
+                <span class="relacion-label">Edad</span>
+                <span class="relacion-value">@edad años</span>
+            </div>
+        }
+        @if (Ref?.fechaNacimiento is DateTime fechaNac)
+        {
+            <div class="relacion-field">
+                <span class="relacion-label">Fecha de nacimiento</span>
+                <span class="relacion-value">@fechaNac.ToString("dd/MM/yyyy")</span>
+            </div>
+        }
+        @if (!string.IsNullOrWhiteSpace(SexoMostrado))
+        {
+            <div class="relacion-field">
+                <span class="relacion-label">Sexo</span>
+                <span class="relacion-value relacion-value--capitalize">@SexoMostrado</span>
+            </div>
+        }
+        @if (Ref?.fechaFallecimiento is DateTime fechaFall)
+        {
+            <div class="relacion-field">
+                <span class="relacion-label">Fecha de fallecimiento</span>
+                <span class="relacion-value">@fechaFall.ToString("dd/MM/yyyy")</span>
+            </div>
+        }
+        @if (Ref is not null && TieneDatosDemograficos)
+        {
+            <div class="relacion-field">
+                <span class="relacion-label">Estado</span>
+                <span class="relacion-value">@(Ref.activo ? "Activo" : "Inactivo")</span>
             </div>
         }
     </div>
+
+    @if (EsElegible)
+    {
+        <div class="relacion-actions">
+            @if (EsPerfilActivo)
+            {
+                <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="VolverAMiPerfilAsync">
+                    Volver a mi perfil
+                </button>
+            }
+            else
+            {
+                <button type="button" class="btn btn-success btn-sm" @onclick="UsarPerfilAsync">
+                    Usar este perfil
+                </button>
+            }
+        </div>
+    }
 </div>
 
 @code {
     [Parameter]
     public Relacion Relacion { get; set; } = new();
+
+    [Parameter]
+    public bool EsElegible { get; set; }
+
+    [Parameter]
+    public bool EsPerfilActivo { get; set; }
+
+    [Parameter]
+    public EventCallback OnUsarPerfil { get; set; }
+
+    [Parameter]
+    public EventCallback OnVolverAMiPerfil { get; set; }
+
+    private RelacionReferencia? Ref => Relacion.referencia;
+
+    /// <summary>Evita mostrar Estado cuando referencia es solo un ObjectId (activo default false).</summary>
+    private bool TieneDatosDemograficos =>
+        !string.IsNullOrWhiteSpace(Ref?.nombre)
+        || !string.IsNullOrWhiteSpace(Ref?.apellido)
+        || !string.IsNullOrWhiteSpace(Ref?.documento)
+        || Ref?.fechaNacimiento is not null
+        || Ref?.edad is not null;
+
+    private string? NombreCompleto
+    {
+        get
+        {
+            if (!string.IsNullOrWhiteSpace(Ref?.nombreCompleto))
+                return Ref.nombreCompleto.Trim();
+
+            var parts = $"{Ref?.apellido} {Ref?.nombre}".Trim();
+            return string.IsNullOrWhiteSpace(parts) ? null : parts;
+        }
+    }
+
+    private string? SexoMostrado =>
+        !string.IsNullOrWhiteSpace(Ref?.sexo) ? Ref.sexo
+        : !string.IsNullOrWhiteSpace(Ref?.genero) ? Ref.genero
+        : null;
+
+    private int? EdadMostrada
+    {
+        get
+        {
+            if (Ref?.edad is int edad)
+                return edad;
+
+            if (Ref?.fechaNacimiento is DateTime fechaNac)
+            {
+                var hoy = DateTime.Today;
+                var calculada = hoy.Year - fechaNac.Year;
+                if (fechaNac.Date > hoy.AddYears(-calculada))
+                    calculada--;
+                return calculada >= 0 ? calculada : null;
+            }
+
+            return null;
+        }
+    }
+
+    private Task UsarPerfilAsync() => OnUsarPerfil.InvokeAsync();
+
+    private Task VolverAMiPerfilAsync() => OnVolverAMiPerfil.InvokeAsync();
 }

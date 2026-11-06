@@ -9,6 +9,11 @@
     margin-bottom: 3rem;
 }
 
+.elegibles-hint {
+    color: #555;
+    margin-bottom: 1.25rem;
+}
+
 .relaciones-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));

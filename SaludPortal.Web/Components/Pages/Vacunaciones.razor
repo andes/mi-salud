@@ -20,7 +20,11 @@
                         BackHref="/"
                         BackAriaLabel="Volver al Inicio" />
 
-    @if (lstVacunaciones != null && lstVacunaciones.Any())
+    @if (EsPerfilFamiliar)
+    {
+        <EmptyState Message="Las vacunas del familiar no están disponibles en el portal." />
+    }
+    else if (lstVacunaciones != null && lstVacunaciones.Any())
     {
         <div class="vacunaciones-section">
             <SectionTitle Title="Vacunaciones" Icon="bi bi-syringe" />
@@ -43,6 +47,9 @@
 
     protected override async Task OnAuthenticatedInitializedAsync()
     {
+        if (EsPerfilFamiliar)
+            return;
+
         var token = BackendToken;
         if (string.IsNullOrEmpty(token))
             return;

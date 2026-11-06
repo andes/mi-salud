@@ -1,3 +1,50 @@
+.dropdown {
+    position: relative;
+    z-index: 1040;
+}
+
+.dropdown-menu {
+    z-index: 1050;
+    background-color: #fff;
+}
+
+.perfil-btn--titular {
+    background-color: #2b3e4c;
+}
+
+.perfil-btn--familiar {
+    background-color: #87b867;
+    border-color: #6fa04f;
+    color: #1a2a14;
+}
+
+.perfil-btn--familiar:hover,
+.perfil-btn--familiar:focus {
+    background-color: #78a85a;
+    border-color: #5f8f42;
+    color: #1a2a14;
+}
+
+.dropdown .dropdown-toggle {
+    width: 100%;
+}
+
+.btn-volver-perfil {
+    width: 100%;
+    background-color: #ffecc1;
+    border: 1px solid #e0d0a8;
+    color: #1a2a14;
+    font-size: 0.8rem;
+    white-space: nowrap;
+}
+
+.btn-volver-perfil:hover,
+.btn-volver-perfil:focus {
+    background-color: #ffe3a0;
+    border-color: #d4c08a;
+    color: #1a2a14;
+}
+
 .navbar-toggler {
     appearance: none;
     cursor: pointer;
@@ -7,6 +54,7 @@
     position: absolute;
     top: 0.5rem;
     right: 1rem;
+    z-index: 1060;
     border: 1px solid rgba(255, 255, 255, 0.1);
     background: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30'%3e%3cpath stroke='rgba%28255, 255, 255, 0.55%29' stroke-linecap='round' stroke-miterlimit='10' stroke-width='2' d='M4 7h22M4 15h22M4 23h22'/%3e%3c/svg%3e") no-repeat center/1.75rem rgba(255, 255, 255, 0.1);
 }
@@ -18,6 +66,24 @@
 .top-row {
     min-height: 3.5rem;
     background-color: rgba(0,0,0,0.4);
+    position: relative;
+    z-index: 1040;
+    overflow: visible;
+}
+
+.top-row--con-volver {
+    min-height: 5.5rem;
+    padding-bottom: 0.5rem;
+}
+
+.top-row .container-fluid {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+}
+
+.top-row .dropdown {
+    width: 100%;
 }
 
 .navbar-brand {

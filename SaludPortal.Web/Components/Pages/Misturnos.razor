@@ -94,7 +94,7 @@
         _spinnerService.Show();
         try
         {
-            turnos = await _obtenerTurnosUseCase.EjecutarAsync();
+            turnos = await _obtenerTurnosUseCase.EjecutarAsync(FamiliarIdParaAndes);
         }
         catch (Exception ex)
         {

@@ -157,7 +157,7 @@
         _spinnerService.Show();
         try
         {
-            turnos = await _obtenerHistorialTurnosUseCase.EjecutarAsync();
+            turnos = await _obtenerHistorialTurnosUseCase.EjecutarAsync(FamiliarIdParaAndes);
         }
         catch (Exception exception)
         {

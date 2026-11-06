@@ -70,14 +70,19 @@
         if (string.IsNullOrEmpty(token))
             return;
 
-        var pacienteId = PacienteId;
+        await RefreshPerfilActivoAsync();
+        var pacienteId = IdPacienteActivo ?? PacienteId;
         if (string.IsNullOrEmpty(pacienteId))
             return;
 
         _ = Telemetry.TrackClickAsync("turnos/confirmar", metadata: new { turnoId = TurnoDisponible.Id, efector = TurnoDisponible.NombreEfector });
 
         _spinnerService.Show();
-        bool resultado = await _registrarTurnoUseCase.EjecutarAsync(pacienteId, TurnoDisponible);
+        bool resultado = await _registrarTurnoUseCase.EjecutarAsync(
+            pacienteId,
+            TurnoDisponible,
+            pacienteOverride: PerfilActivo.ToPacienteSnapshot(),
+            familiarIdParaListar: FamiliarIdParaAndes);
         _spinnerService.Hide();
 
         if (resultado)

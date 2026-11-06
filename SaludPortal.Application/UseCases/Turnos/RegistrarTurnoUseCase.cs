@@ -1,6 +1,7 @@
 ﻿using AndesServices.Interfaces;
 using SaludPortal.Application.Models.Turnos;
 using SaludPortal.Application.Utils;
+using PacienteEntity = AndesServices.Entities.Paciente;
 
 namespace SaludPortal.Application.UseCases.Turnos;
 
@@ -17,31 +18,32 @@ public class RegistrarTurnoUseCase
         _misTurnosService = misTurnosService;
     }
 
-    public async Task<bool> EjecutarAsync(string pacienteId, TurnoDisponible t)
+    /// <param name="familiarIdParaListar">Para colisiones: listar turnos del familiar activo.</param>
+    /// <param name="pacienteOverride">Snapshot si GET paciente del hijo falla.</param>
+    public async Task<bool> EjecutarAsync(
+        string pacienteId,
+        TurnoDisponible t,
+        PacienteEntity? pacienteOverride = null,
+        string? familiarIdParaListar = null)
     {
-        var paciente = await _pacienteService.ObtenerPacientePorIdAsync(pacienteId);
+        var paciente = await _pacienteService.ObtenerPacientePorIdAsync(pacienteId)
+            ?? pacienteOverride;
         if (paciente == null)
-        {
-            return false; // O manejar el caso de paciente no encontrado según sea necesario
-        }
+            return false;
 
-        // Validación defensiva: verificar que el paciente no tenga otro turno activo en el mismo horario
-        var turnosPaciente = await _obtenerTurnosUseCase.EjecutarAsync();
+        var turnosPaciente = await _obtenerTurnosUseCase.EjecutarAsync(familiarIdParaListar);
         if (turnosPaciente != null && turnosPaciente.Any())
         {
             var tieneColision = turnosPaciente.Any(turno => turno.FechaHora == t.FechaHora);
-
             if (tieneColision)
-            {
-                return false; // Hay colisión de horario con otro turno activo
-            }
+                return false;
         }
 
         var tipoTurno = t.FechaHora.Date == DateTimeHelper.NowArgentina().Date
             ? "delDia"
             : "programado";
 
-        bool resultado = await _misTurnosService.RegistrarTurnoAsync(t.Id, t.BloqueId, t.AgendaId, paciente, t.TipoPrestacionDetalle, tipoTurno);
-        return resultado;
+        return await _misTurnosService.RegistrarTurnoAsync(
+            t.Id, t.BloqueId, t.AgendaId, paciente, t.TipoPrestacionDetalle, tipoTurno);
     }
 }

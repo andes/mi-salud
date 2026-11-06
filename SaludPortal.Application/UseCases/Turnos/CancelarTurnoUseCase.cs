@@ -1,4 +1,5 @@
 using AndesServices.Interfaces;
+using PacienteEntity = AndesServices.Entities.Paciente;
 
 namespace SaludPortal.Application.UseCases.Turnos;
 
@@ -13,9 +14,16 @@ public class CancelarTurnoUseCase
         _misTurnosService = misTurnosService;
     }
 
-    public async Task<bool> EjecutarAsync(string pacienteId, string idTurno, string idBloque, string idAgenda)
+    /// <param name="pacienteOverride">Snapshot del familiar si GET paciente/{id} no está autorizado.</param>
+    public async Task<bool> EjecutarAsync(
+        string pacienteId,
+        string idTurno,
+        string idBloque,
+        string idAgenda,
+        PacienteEntity? pacienteOverride = null)
     {
-        var paciente = await _pacienteService.ObtenerPacientePorIdAsync(pacienteId);
+        var paciente = await _pacienteService.ObtenerPacientePorIdAsync(pacienteId)
+            ?? pacienteOverride;
         if (paciente == null)
             return false;
 

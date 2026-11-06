@@ -1,0 +1,29 @@
+.actuar-familiar-modal__lista .list-group-item {
+    background-color: #fff;
+    color: #212529;
+    border-color: #ced4da;
+}
+
+.actuar-familiar-modal__lista .list-group-item-action:not(.active):not(:disabled):hover {
+    background-color: #eef5e9;
+    color: #1a2a14;
+}
+
+.actuar-familiar-modal__lista .list-group-item.active {
+    background-color: #87b867;
+    border-color: #6fa04f;
+    color: #1a2a14;
+}
+
+.actuar-familiar-modal__lista .list-group-item.active .actuar-familiar-modal__edad {
+    color: rgba(26, 42, 20, 0.75);
+}
+
+.actuar-familiar-modal__lista .list-group-item:disabled,
+.actuar-familiar-modal__lista .list-group-item.disabled {
+    opacity: 1;
+}
+
+.actuar-familiar-modal__lista .list-group-item:not(.active) .actuar-familiar-modal__edad {
+    color: #495057;
+}

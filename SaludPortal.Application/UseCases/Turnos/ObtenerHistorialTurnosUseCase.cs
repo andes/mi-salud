@@ -17,12 +17,13 @@ public class ObtenerHistorialTurnosUseCase
         _turnosConfig = turnosConfig;
     }
 
-    public async Task<List<Turno>> EjecutarAsync()
+    /// <param name="familiarId">Id MPI del familiar cuando el perfil activo no es el titular.</param>
+    public async Task<List<Turno>> EjecutarAsync(string? familiarId = null)
     {
         var ahora = DateTimeHelper.ToArgentinaTime(DateTime.UtcNow);
         var minutosVisualizacion = Math.Max(0, _turnosConfig.MinutosVisualizacionTelemedicina);
 
-        var turnos = await _misTurnosService.ObtenerMisTurnosAsync("");
+        var turnos = await _misTurnosService.ObtenerMisTurnosAsync(familiarId);
         if (turnos == null)
         {
             throw new InvalidOperationException("No se pudieron obtener los turnos desde Andes.");

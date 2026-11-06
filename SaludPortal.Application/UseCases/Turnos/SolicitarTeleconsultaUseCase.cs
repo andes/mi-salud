@@ -1,6 +1,7 @@
 ﻿using AndesServices.Interfaces;
 using SaludPortal.Application.Models.Turnos;
 using SaludPortal.Application.Utils;
+using PacienteEntity = AndesServices.Entities.Paciente;
 
 namespace SaludPortal.Application.UseCases.Turnos;
 
@@ -17,31 +18,32 @@ public class SolicitarTeleconsultaUseCase
         _misTurnosService = misTurnosService;
     }
 
-    public async Task<bool> EjecutarAsync(string pacienteId, TurnoDisponible t, string motivoConsulta, string telefono)
+    public async Task<bool> EjecutarAsync(
+        string pacienteId,
+        TurnoDisponible t,
+        string motivoConsulta,
+        string telefono,
+        PacienteEntity? pacienteOverride = null,
+        string? familiarIdParaListar = null)
     {
-        var paciente = await _pacienteService.ObtenerPacientePorIdAsync(pacienteId);
+        var paciente = await _pacienteService.ObtenerPacientePorIdAsync(pacienteId)
+            ?? pacienteOverride;
         if (paciente == null)
-        {
-            return false; // O manejar el caso de paciente no encontrado según sea necesario
-        }
+            return false;
 
-        // Validación defensiva: verificar que el paciente no tenga otro turno de teleconsulta
-        var turnosPaciente = await _obtenerTurnosUseCase.EjecutarAsync();
+        var turnosPaciente = await _obtenerTurnosUseCase.EjecutarAsync(familiarIdParaListar);
         if (turnosPaciente != null && turnosPaciente.Any())
         {
             var tieneColision = turnosPaciente.Any(turno => turno.EsTeleconsulta);
-
             if (tieneColision)
-            {
-                return false; // Hay colisión con otro turno activo
-            }
+                return false;
         }
 
         var tipoTurno = t.FechaHora.Date == DateTimeHelper.NowArgentina().Date
             ? "delDia"
             : "programado";
 
-        bool resultado = await _misTurnosService.RegistrarTurnoTeleConsultaAsync(
+        return await _misTurnosService.RegistrarTurnoTeleConsultaAsync(
             t.Id,
             t.BloqueId,
             t.AgendaId,
@@ -50,7 +52,5 @@ public class SolicitarTeleconsultaUseCase
             motivoConsulta,
             telefono,
             tipoTurno);
-            
-        return resultado;
     }
 }

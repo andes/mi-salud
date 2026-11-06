@@ -486,7 +486,8 @@
         if (string.IsNullOrEmpty(token))
             return;
 
-        var pacienteId = PacienteId;
+        await RefreshPerfilActivoAsync();
+        var pacienteId = IdPacienteActivo ?? PacienteId;
         if (string.IsNullOrEmpty(pacienteId))
             return;
 
@@ -503,7 +504,9 @@
                     pacienteId,
                     turnoDisponible,
                     motivoCompleto,
-                    telefonoCompleto);
+                    telefonoCompleto,
+                    pacienteOverride: PerfilActivo.ToPacienteSnapshot(),
+                    familiarIdParaListar: FamiliarIdParaAndes);
 
             _spinnerService.Hide();
 

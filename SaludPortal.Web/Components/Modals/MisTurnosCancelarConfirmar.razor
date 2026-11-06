@@ -82,8 +82,14 @@
 
         _spinnerService.Show();
 
-        var pacienteId = PacienteId;
-        bool resultado = await _cancelarTurnoUseCase.EjecutarAsync(pacienteId, IdTurno, IdBloque, IdAgenda);
+        await RefreshPerfilActivoAsync();
+        var pacienteId = IdPacienteActivo ?? PacienteId;
+        bool resultado = await _cancelarTurnoUseCase.EjecutarAsync(
+            pacienteId,
+            IdTurno,
+            IdBloque,
+            IdAgenda,
+            pacienteOverride: PerfilActivo.ToPacienteSnapshot());
         _spinnerService.Hide();
 
         if (resultado)

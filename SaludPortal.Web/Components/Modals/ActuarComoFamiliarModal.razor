@@ -1,0 +1,123 @@
+@using SaludPortal.Application.Models.GrupoFamiliar
+@using SaludPortal.Application.UseCases.GrupoFamiliar
+@using SaludPortal.Web.Services
+
+@inject ObtenerFamiliaresElegiblesUseCase ObtenerFamiliaresElegibles
+@inject PerfilActivoService PerfilActivo
+@inject NavigationManager Nav
+@inject TelemetryService Telemetry
+
+<div class="actuar-familiar-modal">
+    <h4 class="mb-3">Actuar como un familiar</h4>
+
+    <div class="alert alert-info" role="status">
+        <p class="mb-2">
+            Al elegir un familiar, el portal muestra y opera sus datos: turnos, laboratorios,
+            Mis datos, historia de salud, recetas y programas.
+        </p>
+        <p class="mb-0">
+            El nombre del perfil activo aparece en el botón de tu cuenta (con otro color si es un familiar).
+            Podés volver a tu perfil desde este mismo diálogo.
+        </p>
+    </div>
+
+    @if (_cargando)
+    {
+        <p class="text-secondary" aria-live="polite">Cargando familiares…</p>
+    }
+    else
+    {
+        <div class="list-group actuar-familiar-modal__lista mb-3">
+            <button type="button"
+                    class="list-group-item list-group-item-action @(!_esFamiliar ? "active" : null)"
+                    disabled="@(!_esFamiliar)"
+                    @onclick="VolverAMiPerfilAsync">
+                Mi perfil (@(NombreTitular ?? "Usuario"))
+            </button>
+
+            @if (_elegibles.Count == 0)
+            {
+                <div class="list-group-item text-muted">
+                    No hay familiares disponibles para operar (hijos/as menores de 13 años).
+                </div>
+            }
+            else
+            {
+                @foreach (var familiar in _elegibles)
+                {
+                    var esActivo = _esFamiliar
+                        && string.Equals(_familiarActivo?.Id, familiar.Id, StringComparison.OrdinalIgnoreCase);
+                    <button type="button"
+                            class="list-group-item list-group-item-action @(esActivo ? "active" : null)"
+                            disabled="@esActivo"
+                            @onclick="() => SeleccionarFamiliarAsync(familiar)">
+                        @(familiar.NombreCompleto ?? "Familiar")
+                        @if (familiar.Edad is int edad)
+                        {
+                            <span class="actuar-familiar-modal__edad"> (@edad años)</span>
+                        }
+                    </button>
+                }
+            }
+        </div>
+    }
+
+    <div class="d-flex justify-content-end">
+        <button type="button" class="btn btn-secondary" @onclick="CerrarAsync" title="Cerrar">Cerrar</button>
+    </div>
+</div>
+
+@code {
+    [CascadingParameter] BlazoredModalInstance ModalInstance { get; set; } = default!;
+
+    [Parameter] public string? TitularPacienteId { get; set; }
+    [Parameter] public string? NombreTitular { get; set; }
+
+    private List<FamiliarPerfil> _elegibles = [];
+    private FamiliarPerfil? _familiarActivo;
+    private bool _esFamiliar;
+    private bool _cargando = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _familiarActivo = await PerfilActivo.GetAsync();
+        _esFamiliar = _familiarActivo != null && !string.IsNullOrWhiteSpace(_familiarActivo.Id);
+
+        if (!string.IsNullOrWhiteSpace(TitularPacienteId))
+            _elegibles = await ObtenerFamiliaresElegibles.EjecutarAsync(TitularPacienteId);
+
+        _cargando = false;
+    }
+
+    private async Task VolverAMiPerfilAsync()
+    {
+        if (!_esFamiliar)
+            return;
+
+        _ = Telemetry.TrackClickAsync("account/volver-perfil", Nav.Uri);
+        await PerfilActivo.SalirAsync();
+        await ModalInstance.CloseAsync();
+        Nav.NavigateTo(Nav.Uri, forceLoad: true);
+    }
+
+    private async Task SeleccionarFamiliarAsync(FamiliarPerfil familiar)
+    {
+        if (familiar == null || string.IsNullOrWhiteSpace(familiar.Id))
+            return;
+
+        if (_esFamiliar
+            && string.Equals(_familiarActivo?.Id, familiar.Id, StringComparison.OrdinalIgnoreCase))
+            return;
+
+        _ = Telemetry.TrackClickAsync("account/seleccionar-perfil", Nav.Uri);
+        await PerfilActivo.SeleccionarFamiliarAsync(familiar);
+        await ModalInstance.CloseAsync();
+        Nav.NavigateTo(Nav.Uri, forceLoad: true);
+    }
+
+    private async Task CerrarAsync()
+    {
+        _ = Telemetry.TrackClickAsync("account/actuar-familiar-cerrar");
+        await ModalInstance.CloseAsync();
+    }
+}

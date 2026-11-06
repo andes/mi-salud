@@ -1,5 +1,6 @@
 ﻿using AndesServices.DTOs.Turnos;
 using AndesServices.Entities;
+using AndesServices.Exceptions;
 using AndesServices.Interfaces;
 using Newtonsoft.Json;
 using System.Text.Json;
@@ -71,11 +72,21 @@ namespace AndesServices.Services
             return false;
         }
 
-        public async Task<List<MisTurnos>?> ObtenerMisTurnosAsync(string? documento = "")
+        public async Task<List<MisTurnos>?> ObtenerMisTurnosAsync(string? familiarId = null)
         {
             try
             {
-                using (HttpResponseMessage res = await _andesClient.GetAsync("modules/mobileApp/turnos"))
+                var url = "modules/mobileApp/turnos";
+                if (!string.IsNullOrWhiteSpace(familiarId))
+                {
+                    var familiarJson = JsonConvert.SerializeObject(new { id = familiarId });
+                    url = Microsoft.AspNetCore.WebUtilities.QueryHelpers.AddQueryString(
+                        url,
+                        "familiar",
+                        familiarJson);
+                }
+
+                using (HttpResponseMessage res = await _andesClient.GetAsync(url))
                 {
                     if (res.IsSuccessStatusCode)
                     {
@@ -275,9 +286,19 @@ namespace AndesServices.Services
                     {
                         string body = await res.Content.ReadAsStringAsync();
                         _logger.LogError("Obtener agendas fallo HTTP {Code} {Reason} Body:{Body}", (int)res.StatusCode, res.ReasonPhrase, body);
+                        if ((int)res.StatusCode is 401 or 403)
+                        {
+                            throw new AndesUnauthorizedException(
+                                "Andes no autorizó agendasDisponibles para este paciente.",
+                                (int)res.StatusCode);
+                        }
                         return null;
                     }
                 }
+            }
+            catch (AndesUnauthorizedException)
+            {
+                throw;
             }
             catch (Exception exception)
             {

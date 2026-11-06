@@ -8,7 +8,8 @@ namespace AndesServices.Interfaces
         Task<bool> RegistrarTurnoTeleConsultaAsync(string idTurno, string idBloque, string idAgenda, Paciente paciente, TipoPrestacion tipoPrestacion, string motivoConsulta, string telefono, string tipoTurno);
         Task<bool> ActualizarTurnoAsync(string idTurno, string motivoConsulta, string profesional, DateTime fechaHoraDacion);
         Task<bool> CancelarTurnoAsync(string idTurno, string idBloque, string idAgenda, Paciente paciente);
-        Task<List<MisTurnos>?> ObtenerMisTurnosAsync(string documento);
+        /// <param name="familiarId">Si hay perfil familiar, id MPI del beneficiario (query ?familiar={"id":"..."}).</param>
+        Task<List<MisTurnos>?> ObtenerMisTurnosAsync(string? familiarId = null);
         Task<MisTurnos> ObtenerTurnoPorIdAsync(string idTurno);
         Task<List<OrganizacionAgenda>> ObtenerAgendasOrganizaciones(string idPaciente, userLocation userLocation, bool esTeleconsulta);
         Task<List<ConceptoTurneable>> ObtenerConceptosTurneablesAsync(bool esTeleConsulta = false);

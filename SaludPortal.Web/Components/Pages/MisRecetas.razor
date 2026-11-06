@@ -48,7 +48,7 @@
             return;
 
         _spinnerService.Show();
-        recetas = await _obtenerRecetasUseCase.EjecutarAsync(PacienteId);
+        recetas = await _obtenerRecetasUseCase.EjecutarAsync(IdPacienteActivo ?? PacienteId);
         _spinnerService.Hide();
     }
 }

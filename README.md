@@ -153,3 +153,7 @@ Para activarlo:
 
 
 En Docker/producción, apuntar `AdminLogs__BaseUrl` a la URL real del Admin (no usar service discovery de Aspire).
+
+## Documentación
+
+- Requisitos funcionales y no funcionales (EARS): [docs/spec.md](docs/spec.md)

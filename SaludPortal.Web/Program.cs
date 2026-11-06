@@ -101,6 +101,8 @@ builder.Services.AddScoped<ObtenerCentrosSaludUseCase>();
 builder.Services.AddScoped<ObtenerTodosLosLaboratoriosUseCase>();
 builder.Services.AddScoped<DescargarInformeLaboratorioUseCase>();
 builder.Services.AddScoped<ObtenerGrupoFamiliarUseCase>();
+builder.Services.AddScoped<ObtenerFamiliaresElegiblesUseCase>();
+builder.Services.AddScoped<PerfilActivoService>();
 builder.Services.AddScoped<RegistrarCuentaUseCase>();
 builder.Services.AddScoped<ValidarCodigoActivacionUseCase>();
 builder.Services.AddScoped<SolicitarRecuperacionContraseniaUseCase>();

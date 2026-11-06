@@ -54,14 +54,18 @@ namespace SaludPortal.Web.Components.Pages
             if (string.IsNullOrEmpty(token))
                 return;
 
-            var pacienteId = PacienteId;
+            var pacienteId = IdPacienteActivo ?? PacienteId;
             if (string.IsNullOrEmpty(pacienteId))
                 return;
 
             _spinnerService.Show();
-           
-            // Cargar paciente
+
             paciente = await _pacienteService.ObtenerPacientePorIdAsync(pacienteId);
+            if (paciente == null && EsPerfilFamiliar)
+            {
+                // GET paciente/{hijo} puede fallar si no está en token; PUT familiar suele autorizar.
+                paciente = PerfilActivo.ToPacienteSnapshot();
+            }
 
             // Cargar provincias
             provincias = await _territorioService.ObtenerProvinciasAsync();

@@ -1,31 +1,57 @@
 ﻿@using AndesServices.Entities
+@using Blazored.Modal
+@using Blazored.Modal.Services
 @using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.JSInterop
+@using SaludPortal.Application.Models.GrupoFamiliar
 @using SaludPortal.Application.UseCases.Consentimiento
 @using SaludPortal.Web.Components.Icons
+@using SaludPortal.Web.Components.Modals
 @using SaludPortal.Web.Services
 @inject NavigationManager Nav
 @inject TelemetryService Telemetry
 @inject IJSRuntime JS
 @inject ObtenerConsentimientosUseCase ObtenerConsentimientosUseCase
+@inject PerfilActivoService PerfilActivo
+@implements IDisposable
 
 <CascadingAuthenticationState>
-    <div class="top-row ps-3 navbar navbar-dark">
+    <div class="top-row ps-3 navbar navbar-dark @(EsPerfilFamiliar ? "top-row--con-volver" : null)">
         <div class="container-fluid">
             <div class="dropdown">
-                <button class="btn btn-secondary dropdown-toggle" style="background-color:#2b3e4c;" type="button" id="dropdownMenuMiCuenta" data-bs-toggle="dropdown" aria-expanded="false" title="@(userName ?? "Usuario")">
-                    @(NombreUsuarioLogueado ?? "Usuario")
+                <button class="btn btn-secondary dropdown-toggle @(EsPerfilFamiliar ? "perfil-btn--familiar" : "perfil-btn--titular")"
+                        type="button"
+                        id="dropdownMenuMiCuenta"
+                        data-bs-toggle="dropdown"
+                        aria-expanded="false"
+                        title="@TituloPerfil">
+                    @NombrePerfilActivo
                 </button>
                 <ul class="dropdown-menu">
                     <li>
-                        <a href="/mis-datos" class="dropdown-item" @onclick='() => TrackClick("account/mis-datos", "/mis-datos")'><Icon Name="mis-datos" Fill="#000" AriaLabel="Mis datos" /> Mis datos</a>
+                        <a href="/mis-datos" class="dropdown-item" @onclick="OnMisDatosClickAsync"><Icon Name="mis-datos" Fill="#000" AriaLabel="Mis datos" /> Mis datos</a>
+                    </li>
+                    <li>
+                        <button type="button" class="dropdown-item" @onclick="AbrirActuarComoFamiliarAsync">
+                            <Icon Name="arrow-left-right" Fill="#000" AriaLabel="Actuar como un familiar" /> Actuar como un familiar
+                        </button>
                     </li>
                     <li>
                         <form action="/logout" method="post">
-                            <button type="submit" class="dropdown-item" @onclick='() => TrackClick("account/logout", "/logout")'><Icon Name="logout" Fill="#000" AriaLabel="Cerrar sesión" /> Cerrar Sesión</button>
+                            <button type="submit" class="dropdown-item" @onclick="OnLogoutClickAsync"><Icon Name="logout" Fill="#000" AriaLabel="Cerrar sesión" /> Cerrar Sesión</button>
                         </form>
                     </li>
                 </ul>
             </div>
+            @if (EsPerfilFamiliar)
+            {
+                <button type="button"
+                        class="btn btn-sm btn-volver-perfil mt-2"
+                        title="Volver a mi perfil"
+                        @onclick="VolverAMiPerfilAsync">
+                    Volver a mi perfil
+                </button>
+            }
         </div>
     </div>
 
@@ -89,9 +115,32 @@
 @code {
 
     [CascadingParameter] private Task<AuthenticationState>? AuthStateTask { get; set; }
+    [CascadingParameter] private IModalService Modal { get; set; } = default!;
+
     private string? userName;
-    private string? NombreUsuarioLogueado;
+    private string? NombreTitular;
+    private string? _titularPacienteId;
+    private FamiliarPerfil? _familiar;
     private bool isNavMenuOpen;
+
+    private bool EsPerfilFamiliar => _familiar != null && !string.IsNullOrWhiteSpace(_familiar.Id);
+
+    private string NombrePerfilActivo =>
+        EsPerfilFamiliar
+            ? (_familiar!.NombreCompleto ?? "Familiar")
+            : (NombreTitular ?? "Usuario");
+
+    private string TituloPerfil
+    {
+        get
+        {
+            if (!EsPerfilFamiliar)
+                return NombreTitular ?? "Usuario";
+
+            var nombre = _familiar!.NombreCompleto ?? "Familiar";
+            return _familiar.Edad is int edad ? $"{nombre} ({edad} años)" : nombre;
+        }
+    }
 
     protected override async Task OnParametersSetAsync()
     {
@@ -101,7 +150,80 @@
         var alias = auth.User.GetAlias();
         var nombre = auth.User.GetNombre();
         var apellido = auth.User.GetApellido();
-        NombreUsuarioLogueado = Paciente.GetDisplayName(nombre, apellido, alias);
+        NombreTitular = Paciente.GetDisplayName(nombre, apellido, alias);
+        _titularPacienteId = auth.User.GetPacienteId();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+            return;
+
+        PerfilActivo.Changed += OnPerfilChanged;
+        await CargarPerfilAsync();
+    }
+
+    private async Task CargarPerfilAsync()
+    {
+        _familiar = await PerfilActivo.GetAsync();
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private void OnPerfilChanged() => _ = InvokeAsync(CargarPerfilAsync);
+
+    private async Task VolverAMiPerfilAsync()
+    {
+        if (!EsPerfilFamiliar)
+            return;
+
+        TrackClick("account/volver-perfil", Nav.Uri);
+        await CerrarMenuCuentaAsync();
+        await PerfilActivo.SalirAsync();
+        _familiar = null;
+        Nav.NavigateTo(Nav.Uri, forceLoad: true);
+    }
+
+    private async Task AbrirActuarComoFamiliarAsync()
+    {
+        TrackClick("account/actuar-familiar", Nav.Uri);
+        await CerrarMenuCuentaAsync();
+
+        var parameters = new ModalParameters()
+            .Add(nameof(ActuarComoFamiliarModal.TitularPacienteId), _titularPacienteId ?? "")
+            .Add(nameof(ActuarComoFamiliarModal.NombreTitular), NombreTitular ?? "Usuario");
+
+        var options = new ModalOptions
+        {
+            Size = ModalSize.Medium,
+            Position = ModalPosition.TopCenter,
+            HideCloseButton = false,
+            HideHeader = true
+        };
+
+        Modal.Show<ActuarComoFamiliarModal>(parameters, options);
+    }
+
+    private async Task OnMisDatosClickAsync()
+    {
+        TrackClick("account/mis-datos", "/mis-datos");
+        await CerrarMenuCuentaAsync();
+    }
+
+    private async Task OnLogoutClickAsync()
+    {
+        TrackClick("account/logout", "/logout");
+        await CerrarMenuCuentaAsync();
+    }
+
+    private async Task CerrarMenuCuentaAsync()
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("misaludAccountMenu.hide");
+        }
+        catch (JSException)
+        {
+        }
     }
 
     private void OnNavClick(string target, string route)
@@ -113,6 +235,11 @@
     private void TrackClick(string target, string route)
     {
         _ = Telemetry.TrackClickAsync(target, route, new { component = "AccountMenu" });
+    }
+
+    public void Dispose()
+    {
+        PerfilActivo.Changed -= OnPerfilChanged;
     }
 }
 <script src="../js/auth.js"></script>

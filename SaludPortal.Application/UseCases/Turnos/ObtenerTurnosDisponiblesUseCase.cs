@@ -30,43 +30,60 @@ public class ObtenerTurnosDisponiblesUseCase
         _obtenerTurnosUseCase = obtenerTurnosUseCase;
     }
 
-    public async Task<List<TurnosPorTipoPrestacion>> EjecutarAsync(string idPaciente, bool esTeleconsulta = false)
+    /// <param name="idPaciente">Beneficiario (perfil activo).</param>
+    /// <param name="idPacienteDireccionFallback">Titular, si el familiar no tiene MPI legible / dirección.</param>
+    /// <param name="familiarIdParaListar">Query familiar al listar turnos activos para filtros.</param>
+    public async Task<List<TurnosPorTipoPrestacion>> EjecutarAsync(
+        string idPaciente,
+        bool esTeleconsulta = false,
+        string? idPacienteDireccionFallback = null,
+        string? familiarIdParaListar = null)
     {
         var paciente = await _obtenerPacienteUseCase.EjecutarAsync(idPaciente);
-        var turnosPaciente = await _obtenerTurnosUseCase.EjecutarAsync();
+        if (paciente == null
+            && !string.IsNullOrWhiteSpace(idPacienteDireccionFallback)
+            && !string.Equals(idPacienteDireccionFallback, idPaciente, StringComparison.Ordinal))
+        {
+            paciente = await _obtenerPacienteUseCase.EjecutarAsync(idPacienteDireccionFallback);
+        }
+
+        var turnosPaciente = await _obtenerTurnosUseCase.EjecutarAsync(familiarIdParaListar);
 
         var direccionGeografica = paciente?.ObtenerDireccionPrioritaria();
 
         if (direccionGeografica == null)
+            return [];
+
+        if (direccionGeografica.Valor == null
+            || direccionGeografica?.Ubicacion?.Localidad == null
+            || direccionGeografica?.Ubicacion?.Provincia == null)
         {
             return [];
         }
 
-        if (direccionGeografica.Valor == null || direccionGeografica?.Ubicacion?.Localidad == null || direccionGeografica?.Ubicacion?.Provincia == null)
-        {
-            return [];
-        }
-
-        string direccion = direccionGeografica.Valor + ", " + direccionGeografica.Ubicacion.Localidad.Nombre + ", " + direccionGeografica.Ubicacion.Provincia.Nombre;
+        string direccion = direccionGeografica.Valor + ", "
+            + direccionGeografica.Ubicacion.Localidad.Nombre + ", "
+            + direccionGeografica.Ubicacion.Provincia.Nombre;
         var userLocation = await _pacienteService.ObtenerGeoreferenciaPaciente(direccion);
 
         if (userLocation == null)
-        {
             return [];
-        }
 
-        var agendasOrganizacionales = await _misTurnosService.ObtenerAgendasOrganizaciones(idPaciente, userLocation, esTeleconsulta);
+        var agendasOrganizacionales = await _misTurnosService.ObtenerAgendasOrganizaciones(
+            idPaciente, userLocation, esTeleconsulta);
+
+        if (agendasOrganizacionales == null || agendasOrganizacionales.Count == 0)
+            return [];
 
         Dictionary<string, string> domiciliosOrganizaciones = new Dictionary<string, string>();
 
-        // Obtener todos los IDs de organizaciones únicos
         var orgIds = agendasOrganizacionales
-            .SelectMany(e => e.agendas)
+            .SelectMany(e => e.agendas ?? [])
+            .Where(a => a?.organizacion?._id != null)
             .Select(a => a.organizacion._id)
             .Distinct()
             .ToList();
 
-        // Llamar a ObtenerOrganizacionPorIdAsync para cada organización y guardar el domicilio
         foreach (var orgId in orgIds)
         {
             var organizacion = await _organizacionService.ObtenerOrganizacionPorIdAsync(orgId);
@@ -76,12 +93,8 @@ public class ObtenerTurnosDisponiblesUseCase
             }
         }
 
-        if (agendasOrganizacionales == null || agendasOrganizacionales.Count == 0)
-        {
-            return [];
-        }
-
-        var todosLosTurnos = TurnosDisponiblesMapper.MapAgendaToTurnosPorTipoPrestacion(agendasOrganizacionales, domiciliosOrganizaciones);
+        var todosLosTurnos = TurnosDisponiblesMapper.MapAgendaToTurnosPorTipoPrestacion(
+            agendasOrganizacionales, domiciliosOrganizaciones);
 
         return FiltrarPorTurnosPaciente(todosLosTurnos, turnosPaciente);
     }
@@ -99,7 +112,6 @@ public class ObtenerTurnosDisponiblesUseCase
             .Select(t => t.TipoPrestacion!.ConceptId!)
             .ToHashSet();
 
-        // Construir HashSet con todas las fechas ocupadas (solo turnos activos)
         var fechasOcupadas = turnosActivos
             .Select(t => t.FechaHora)
             .ToHashSet();
@@ -111,7 +123,6 @@ public class ObtenerTurnosDisponiblesUseCase
                 efector.TurnosDisponibles = efector.TurnosDisponibles
                     .Where(t =>
                     {
-                        // Filtrar por colisión de horario (cualquier turno del paciente, sin importar estado)
                         if (fechasOcupadas.Contains(t.FechaHora))
                             return false;
 

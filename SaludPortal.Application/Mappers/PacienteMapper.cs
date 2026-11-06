@@ -158,6 +158,8 @@ public static class PacienteMapper
             Nombre = refPaciente?.nombre,
             Apellido = refPaciente?.apellido,
             Documento = refPaciente?.documento,
+            Sexo = refPaciente?.sexo,
+            Edad = refPaciente?.edad,
             FechaNacimiento = refPaciente?.fechaNacimiento,
             FechaFallecimiento = refPaciente?.fechaFallecimiento,
             Activo = refPaciente?.activo ?? false

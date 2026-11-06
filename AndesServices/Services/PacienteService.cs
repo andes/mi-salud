@@ -52,6 +52,40 @@ namespace AndesServices.Services
             }
         }
 
+        /// <summary>
+        /// GET modules/mobileApp/relaciones?id={titularId} — resuelve ObjectIds de relaciones MPI
+        /// y devuelve id/edad/documento del vinculado. No usar GET paciente/:id/relaciones
+        /// (en Andes stock compara mal referencia.documento → unauthorized).
+        /// </summary>
+        public async Task<List<FamiliarRelacion>?> ObtenerRelacionesAsync(string titularId)
+        {
+            if (string.IsNullOrWhiteSpace(titularId))
+                return null;
+
+            try
+            {
+                var url = $"modules/mobileApp/relaciones?id={Uri.EscapeDataString(titularId)}";
+                using var res = await _andesClient.GetAsync(url);
+                if (!res.IsSuccessStatusCode)
+                {
+                    var body = await res.Content.ReadAsStringAsync();
+                    _logger.LogError(
+                        "Obtener relaciones fallo HTTP {Code} {Reason} Body:{Body}",
+                        (int)res.StatusCode,
+                        res.ReasonPhrase,
+                        body);
+                    return null;
+                }
+
+                return await res.Content.ReadFromJsonAsync<List<FamiliarRelacion>>();
+            }
+            catch (Exception exception)
+            {
+                _logger.LogError(exception, "Error al obtener relaciones del paciente {TitularId}", titularId);
+                return null;
+            }
+        }
+
         public async Task<userLocation> ObtenerGeoreferenciaPaciente(string direccion)
         {
             try
@@ -85,7 +119,9 @@ namespace AndesServices.Services
         }
 
         /// <summary>
-        /// PATCH modules/mobileApp/pacientes/:id — body ActualizarPacienteDto; respuesta Paciente actualizado.
+        /// PUT modules/mobileApp/paciente/:id — body ActualizarPacienteDto.
+        /// Autoriza titular (en token.pacientes) o familiar vinculado por ObjectId (Andes).
+        /// Respuesta Andes: { status: "OK" }; se reintenta GET o se devuelve el original fusionado.
         /// </summary>
         public async Task<Paciente> ModificarDatos(string idPaciente, ActualizarPacienteDto dto)
         {
@@ -106,12 +142,8 @@ namespace AndesServices.Services
             
             try
             {
-                // Obtener el paciente original del servidor para comparar cambios
-                Paciente pacienteOriginal = await ObtenerPacientePorIdAsync(idPaciente);
-                if (pacienteOriginal == null)
-                {
-                    throw new Exception("No se pudo obtener el paciente original del servidor.");
-                }
+                // Obtener el paciente original del servidor para comparar cambios (puede ser null si es familiar)
+                Paciente? pacienteOriginal = await ObtenerPacientePorIdAsync(idPaciente);
 
                 // Obtener fecha/hora actual para ultimaActualizacion
                 DateTime fechaActual = DateTime.UtcNow;
@@ -160,11 +192,11 @@ namespace AndesServices.Services
                     }
                 }
 
-                // Serializar el DTO de actualización
+                // PUT autoriza dueño o familiar vinculado (PATCH plural solo dueño en token).
                 var request = new HttpRequestMessage
                 {
-                    Method = HttpMethod.Patch,
-                    RequestUri = new Uri($"modules/mobileApp/pacientes/{idPaciente}", UriKind.Relative),
+                    Method = HttpMethod.Put,
+                    RequestUri = new Uri($"modules/mobileApp/paciente/{idPaciente}", UriKind.Relative),
                     Content = new StringContent(JsonConvert.SerializeObject(dto), System.Text.Encoding.UTF8, "application/json")
                 };
 
@@ -172,14 +204,20 @@ namespace AndesServices.Services
                 {
                     res.EnsureSuccessStatusCode();
 
-                    Paciente pacienteActualizado = await res.Content.ReadFromJsonAsync<Paciente>();
+                    var refetch = await ObtenerPacientePorIdAsync(idPaciente);
+                    if (refetch != null)
+                        return refetch;
 
-                    if (pacienteActualizado == null)
+                    if (pacienteOriginal != null)
+                        return pacienteOriginal;
+
+                    return new Paciente
                     {
-                        throw new Exception("No se pudo obtener la respuesta del servidor.");
-                    }
-
-                    return pacienteActualizado;
+                        id = idPaciente,
+                        _id = idPaciente,
+                        alias = dto.Alias,
+                        genero = dto.Genero
+                    };
                 }
             }
             catch (Exception exception)

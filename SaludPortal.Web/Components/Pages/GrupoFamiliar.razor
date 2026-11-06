@@ -1,7 +1,9 @@
 ﻿@page "/grupofamiliar"
 @rendermode InteractiveServer
 
+@using AndesServices.Entities
 @using SaludPortal.Web.Components.Shared
+@using SaludPortal.Application.Models.GrupoFamiliar
 @using SaludPortal.Application.UseCases.GrupoFamiliar
 @using PacienteEntity = AndesServices.Entities.Paciente
 
@@ -9,6 +11,7 @@
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject BlazorSpinner.SpinnerService _spinnerService
 @inject ObtenerGrupoFamiliarUseCase _obtenerGrupoFamiliarUseCase
+@inject ObtenerFamiliaresElegiblesUseCase _obtenerFamiliaresElegiblesUseCase
 
 <PageTitle>Grupo familiar - Mi Salud</PageTitle>
 
@@ -17,6 +20,11 @@
                         Subtitle="Información personal y relaciones familiares"
                         BackHref="/"
                         BackAriaLabel="Volver al Inicio" />
+
+    @if (!string.IsNullOrWhiteSpace(_mensaje))
+    {
+        <div class="alert alert-info" role="status">@_mensaje</div>
+    }
 
     @if (unPaciente != null)
     {
@@ -27,6 +35,15 @@
 
         <div class="relaciones-section">
             <SectionTitle Title="Relaciones Familiares" />
+
+            @if (_elegibles.Count > 0)
+            {
+                <p class="elegibles-hint">
+                    Podés operar como un hijo/a menor de @ObtenerFamiliaresElegiblesUseCase.EdadMaximaExclusive años
+                    (turnos, laboratorios y datos de contacto).
+                </p>
+            }
+
             @if (unPaciente.relaciones != null && unPaciente.relaciones.Any())
             {
                 <div class="relaciones-grid">
@@ -34,7 +51,17 @@
                     {
                         @if (relacion != null)
                         {
-                            <RelacionCard Relacion="relacion" />
+                            var familiar = BuscarElegible(relacion);
+                            var esElegible = familiar != null;
+                            var esActivo = esElegible
+                                && EsPerfilFamiliar
+                                && string.Equals(FamiliarActivo?.Id, familiar!.Id, StringComparison.OrdinalIgnoreCase);
+
+                            <RelacionCard Relacion="relacion"
+                                          EsElegible="esElegible"
+                                          EsPerfilActivo="esActivo"
+                                          OnUsarPerfil="() => UsarPerfilAsync(familiar!)"
+                                          OnVolverAMiPerfil="SalirDeFamiliarAsync" />
                         }
                     }
                 </div>
@@ -53,6 +80,8 @@
 
 @code {
     private PacienteEntity? unPaciente;
+    private List<FamiliarPerfil> _elegibles = [];
+    private string? _mensaje;
 
     protected override async Task OnAuthenticatedInitializedAsync()
     {
@@ -62,6 +91,33 @@
 
         _spinnerService.Show();
         unPaciente = await _obtenerGrupoFamiliarUseCase.EjecutarAsync(pacienteId);
+        _elegibles = await _obtenerFamiliaresElegiblesUseCase.EjecutarAsync(pacienteId);
         _spinnerService.Hide();
+    }
+
+    private FamiliarPerfil? BuscarElegible(Relacion relacion)
+    {
+        var id = relacion.referencia?.id ?? relacion.referencia?._id;
+        if (string.IsNullOrWhiteSpace(id))
+            return null;
+
+        return _elegibles.FirstOrDefault(e =>
+            string.Equals(e.Id, id, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private async Task UsarPerfilAsync(FamiliarPerfil familiar)
+    {
+        await PerfilActivo.SeleccionarFamiliarAsync(familiar);
+        await RefreshPerfilActivoAsync();
+        _mensaje = $"Ahora operás como {familiar.NombreCompleto}.";
+        StateHasChanged();
+    }
+
+    private async Task SalirDeFamiliarAsync()
+    {
+        await PerfilActivo.SalirAsync();
+        await RefreshPerfilActivoAsync();
+        _mensaje = "Volviste a tu perfil.";
+        StateHasChanged();
     }
 }

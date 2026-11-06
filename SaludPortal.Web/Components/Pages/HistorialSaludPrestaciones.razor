@@ -98,7 +98,7 @@
         if (string.IsNullOrEmpty(token))
             return;
 
-        var pacienteId = PacienteId;
+        var pacienteId = IdPacienteActivo ?? PacienteId;
         if (string.IsNullOrEmpty(pacienteId))
             return;
 
@@ -188,7 +188,7 @@
             return;
         }
 
-        var pacienteId = PacienteId;
+        var pacienteId = IdPacienteActivo ?? PacienteId;
         if (string.IsNullOrEmpty(pacienteId))
         {
             MostrarError("No se encontró el identificador del paciente.");
@@ -225,7 +225,7 @@
             return;
         }
 
-        var pacienteId = PacienteId;
+        var pacienteId = IdPacienteActivo ?? PacienteId;
         if (string.IsNullOrEmpty(pacienteId))
         {
             MostrarError("No se encontró el identificador del paciente.");

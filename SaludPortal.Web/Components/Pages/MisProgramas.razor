@@ -66,7 +66,8 @@
 
     private async Task CargarConsentimientosAsync()
     {
-        if (string.IsNullOrWhiteSpace(PacienteId))
+        var pacienteId = IdPacienteActivo ?? PacienteId;
+        if (string.IsNullOrWhiteSpace(pacienteId))
         {
             return;
         }
@@ -74,7 +75,7 @@
         _spinnerService.Show();
         try
         {
-            consentimientos = await _obtenerConsentimientosUseCase.EjecutarAsync(PacienteId);
+            consentimientos = await _obtenerConsentimientosUseCase.EjecutarAsync(pacienteId);
         }
         finally
         {
@@ -115,7 +116,8 @@
 
     private async Task HandleRespuestaModal(bool aceptado)
     {
-        if (string.IsNullOrWhiteSpace(PacienteId) || _versionRevisar is null)
+        var pacienteId = IdPacienteActivo ?? PacienteId;
+        if (string.IsNullOrWhiteSpace(pacienteId) || _versionRevisar is null)
         {
             _mostrarModal = false;
             _versionRevisar = null;
@@ -131,7 +133,7 @@
             await _guardarRespuestaUseCase.EjecutarAsync(
                 _versionRevisar.Programa,
                 _versionRevisar.Version,
-                PacienteId,
+                pacienteId,
                 aceptado);
 
             await CargarConsentimientosAsync();
